@@ -1,0 +1,19 @@
+{
+  "histories": {
+    "daily": {
+      "quality": []
+    },
+    "intraday": {
+      "quality": [
+        "duplicate_daily_session",
+        "provisional_daily_bar"
+      ]
+    }
+  },
+  "reconciliation": [
+    "corporate_actions_unverified",
+    "independent_source_unavailable"
+  ],
+  "acquisition_errors": {},
+  "action_eligible": false
+}

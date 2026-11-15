@@ -1,0 +1,14 @@
+[
+  {
+    "alert_id": "32849a44e42045839b2cd0eb50a4cb10",
+    "alert_type": "data_failure",
+    "can_confirm_setup": null,
+    "dedup_key": "data_failure:IREDA.NS",
+    "instrument": "IREDA.NS",
+    "message": "Expected bar 2026-11-13T15:15:00+05:30 unavailable past 30s grace period.",
+    "metadata": {},
+    "preliminary_only": false,
+    "severity": "error",
+    "timestamp": "2026-11-13T15:46:00+05:30"
+  }
+]

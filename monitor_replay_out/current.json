@@ -1,0 +1,14 @@
+{
+  "artifacts": {},
+  "capture_id": "cap-2a014b7fef04",
+  "generator_version": "tradingagents-indian-swing/contract-2",
+  "market_hash": null,
+  "policy_version": "neutral-range-2",
+  "reasons": [
+    "completed_provider_bar_unavailable"
+  ],
+  "run_id": "2a014b7fef04467883307b03fa5db2bd",
+  "schema_version": 2,
+  "source_version": "neutral-range-2",
+  "status": "unavailable"
+}

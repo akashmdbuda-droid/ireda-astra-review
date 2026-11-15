@@ -1,0 +1,25 @@
+{
+  "instrument": "IREDA.NS",
+  "symbol": "IREDA.NS",
+  "security_id": "20261",
+  "source": "dhan-marketfeed-quote",
+  "status": "live_quote_supplied",
+  "observed_at": "2026-11-13T15:28:04+05:30",
+  "last_trade_time": "2026-11-13T15:28:04+05:30",
+  "last_price": 118.3,
+  "average_price": 118.21,
+  "volume": 4891585,
+  "buy_quantity": 0,
+  "sell_quantity": 0,
+  "net_change": 0,
+  "ohlc": {
+    "open": 118.8,
+    "close": 118.3,
+    "high": 119.82,
+    "low": 117.31
+  },
+  "52_week_high": 153.48,
+  "52_week_low": 98.78,
+  "upper_circuit_limit": 121.78,
+  "lower_circuit_limit": 114.7
+}

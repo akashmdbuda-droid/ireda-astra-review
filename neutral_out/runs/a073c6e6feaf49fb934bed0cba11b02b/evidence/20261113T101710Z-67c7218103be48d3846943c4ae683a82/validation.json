@@ -1,0 +1,13 @@
+{
+  "histories": {
+    "daily": {
+      "quality": []
+    }
+  },
+  "reconciliation": [
+    "corporate_actions_unverified",
+    "independent_source_unavailable"
+  ],
+  "acquisition_errors": {},
+  "action_eligible": false
+}

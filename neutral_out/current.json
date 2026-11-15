@@ -1,0 +1,17 @@
+{
+  "analysis_mode": "supervised",
+  "artifacts": {},
+  "capture_id": "dc6fa3f4a80473b2",
+  "envelope_path": "runs/a073c6e6feaf49fb934bed0cba11b02b/input_envelope.json",
+  "evidence_status": "insufficient_data",
+  "generator_version": "tradingagents-indian-swing/contract-2",
+  "market_hash": "05448813c989b6e736c64233bb3be06af13abc953aabe49d399c3479f0d0ce46",
+  "policy_version": "neutral-range-2",
+  "report_markdown_path": "runs/a073c6e6feaf49fb934bed0cba11b02b/report.md",
+  "run_id": "a073c6e6feaf49fb934bed0cba11b02b",
+  "scenario_lifecycle_path": "scenarios_history.json",
+  "schema_version": 2,
+  "sessions_path": "runs/a073c6e6feaf49fb934bed0cba11b02b/sessions.json",
+  "source_version": "dhan-read-only|nse-holiday-lists-web-2023-2026@2026-11-13",
+  "status": "pending"
+}

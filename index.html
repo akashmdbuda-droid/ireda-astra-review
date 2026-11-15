@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Neutral Research Dashboard — Read-Only</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%230b1220'/><path d='M3 11l3-4 3 2 4-5' stroke='%2322d3ee' stroke-width='2' fill='none'/></svg>" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-main">
+      <div class="brand">
+        <h1 id="instrumentTitle">Loading…</h1>
+        <span id="headerPriceChip" class="price-chip">—</span>
+      </div>
+      <div class="status-pills">
+        <span id="runStatusBadge" class="badge badge-unavailable">LOADING</span>
+        <span id="freshnessBadge" class="badge badge-unavailable">—</span>
+        <span class="readonly-pill">READ-ONLY RESEARCH · NO EXECUTION</span>
+      </div>
+    </div>
+    <div class="topbar-sub">
+      <div class="run-meta-strip" id="runMetaStrip">
+        <span>Run: —</span>
+        <span>Hash: —</span>
+      </div>
+      <nav class="jump-nav" aria-label="Dashboard sections">
+        <a href="#executiveOverviewPanel">Overview</a>
+        <a href="#tfMatrixPanel">Timeframes</a>
+        <a href="#chartPanel">Chart</a>
+        <a href="#scenariosPanel">Scenarios</a>
+        <a href="#forecastsPanel">Forecasts</a>
+        <a href="#positionPanel">Position</a>
+        <a href="#alertsPanel">Alerts</a>
+        <a href="#performancePanel">Performance</a>
+        <a href="#evidenceHealthPanel">Health</a>
+        <a href="./review.html">Astra Bundle</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="globalHealthBanner" class="alert-banner warn" role="status">
+      Loading validated run state from /api/state…
+    </div>
+
+    <!-- Executive Above-The-Fold Snapshot -->
+    <section class="panel" id="executiveOverviewPanel">
+      <div class="panel-header">
+        <h2 class="panel-title">Executive Market Snapshot</h2>
+        <span class="muted mono" id="heroObservedMeta">—</span>
+      </div>
+      <div class="hero-grid" id="heroOverviewGrid"></div>
+    </section>
+
+    <!-- 5-Timeframe Structural Alignment Matrix -->
+    <section class="panel" id="tfMatrixPanel">
+      <div class="panel-header">
+        <h2 class="panel-title">Multi-Timeframe Alignment (Monthly · Weekly · Daily · 60-Min · 15-Min)</h2>
+        <span class="muted">Tap any timeframe to inspect its chart</span>
+      </div>
+      <div id="tfMatrixCards" class="tf-matrix-grid"></div>
+    </section>
+
+    <!-- 3. Interactive Candlesticks -->
+    <section class="panel" id="chartPanel">
+      <div class="panel-header">
+        <h2 class="panel-title">3. Interactive Multi-Timeframe Candlesticks</h2>
+        <div id="chartBarMeta" class="mono muted">—</div>
+      </div>
+      <div class="chart-toolbar">
+        <div class="toolbar-group">
+          <div class="tf-tabs" id="tfTabs" role="tablist" aria-label="Chart timeframe">
+            <button type="button" class="tf-btn" data-tf="monthly">Monthly</button>
+            <button type="button" class="tf-btn" data-tf="weekly">Weekly</button>
+            <button type="button" class="tf-btn active" data-tf="daily">Daily</button>
+            <button type="button" class="tf-btn" data-tf="60m">60-Min</button>
+            <button type="button" class="tf-btn" data-tf="15m">15-Min</button>
+          </div>
+          <div class="tf-tabs" id="zoomTabs" role="group" aria-label="Visible candle window">
+            <button type="button" class="zoom-btn" data-bars="45">45</button>
+            <button type="button" class="zoom-btn active" data-bars="90">90</button>
+            <button type="button" class="zoom-btn" data-bars="0">All</button>
+          </div>
+        </div>
+        <div class="overlay-toggles">
+          <label class="toggle-pill"><input type="checkbox" id="togEma" checked /> EMAs/SMAs</label>
+          <label class="toggle-pill"><input type="checkbox" id="togBb" /> Bollinger</label>
+          <label class="toggle-pill"><input type="checkbox" id="togFvgActive" checked /> Active FVGs</label>
+          <label class="toggle-pill"><input type="checkbox" id="togFvgFilled" /> Filled FVGs</label>
+          <label class="toggle-pill"><input type="checkbox" id="togGeom" checked /> Trendlines</label>
+          <label class="toggle-pill"><input type="checkbox" id="togFib" checked /> Fib</label>
+          <label class="toggle-pill"><input type="checkbox" id="togAvwap" checked /> AVWAP/POC</label>
+        </div>
+      </div>
+      <div id="chartInspectBar" class="inspect-bar mono muted">
+        Tap or move across the chart to inspect candle OHLCV, EMAs, and RSI.
+      </div>
+      <div class="chart-wrap">
+        <canvas id="candleCanvas" aria-label="Interactive candlestick chart"></canvas>
+      </div>
+      <details id="chartDetails">
+        <summary>Technical Details: AVWAP, Fibonacci, Volume Profile, FVGs &amp; Formulas</summary>
+        <div id="chartDetailsBody"></div>
+      </details>
+    </section>
+
+    <!-- 2. Market Overview -->
+    <section class="panel" id="marketOverviewPanel">
+      <div class="panel-header">
+        <h2 class="panel-title">2. Market Overview (Benchmark · Sector · Stock Separate)</h2>
+        <span class="muted">Single stock never establishes benchmark or sector direction</span>
+      </div>
+      <div class="grid-3" id="marketOverviewGrid"></div>
+    </section>
+
+    <!-- 4. Scenario Cards & 5. Forecast Panel -->
+    <div class="grid-2">
+      <section class="panel" id="scenariosPanel">
+        <div class="panel-header">
+          <h2 class="panel-title">4. Horizon-Separated Scenarios</h2>
+          <span class="muted">Confirmation · Invalidation · Expiry · Delta</span>
+        </div>
+        <div id="scenariosContainer"></div>
+      </section>
+
+      <section class="panel" id="forecastsPanel">
+        <div class="panel-header">
+          <h2 class="panel-title">5. Forecast Horizons (1 / 5 / 20 Sessions)</h2>
+          <span id="forecastOverallBadge" class="badge badge-unavailable">UNAVAILABLE</span>
+        </div>
+        <div id="forecastsContainer"></div>
+      </section>
+    </div>
+
+    <!-- 6. Position Exposure & 7. Alert Timeline -->
+    <div class="grid-2">
+      <section class="panel" id="positionPanel">
+        <div class="panel-header">
+          <h2 class="panel-title">6. Position Exposure &amp; User Downside Scenarios</h2>
+          <span id="holdingsBadge" class="badge badge-unavailable">UNAVAILABLE</span>
+        </div>
+        <div id="positionSummary"></div>
+        <div class="subcard stress-box">
+          <div class="kv-label">Configurable Downside Stress Calculator (Client-Side Only)</div>
+          <p class="muted stress-note">
+            Max tolerable loss is never invented or pre-set. Enter a shock % or target price to model marked impact:
+          </p>
+          <div class="stress-controls">
+            <label class="visually-hidden" for="shockPctInput">Shock percent</label>
+            <input type="number" id="shockPctInput" step="0.5" placeholder="Shock % (e.g. -5)" />
+            <label class="visually-hidden" for="targetPriceInput">Hypothetical price</label>
+            <input type="number" id="targetPriceInput" step="0.05" placeholder="Or Price (e.g. 110)" />
+            <button type="button" id="addDownsideBtn" class="btn-secondary">Compute</button>
+            <button type="button" id="clearDownsideBtn" class="btn-ghost">Clear</button>
+          </div>
+          <div id="downsideResults"></div>
+        </div>
+      </section>
+
+      <section class="panel" id="alertsPanel">
+        <div class="panel-header">
+          <h2 class="panel-title">7. Deduplicated Alert Timeline</h2>
+          <span id="alertsMeta" class="mono muted">—</span>
+        </div>
+        <div id="alertsContainer"></div>
+      </section>
+    </div>
+
+    <!-- 8. Performance Panel -->
+    <section class="panel" id="performancePanel">
+      <div class="panel-header">
+        <h2 class="panel-title">8. Paper Research Performance vs. Baselines (After Costs)</h2>
+        <span id="perfStatusBadge" class="badge badge-unavailable">UNAVAILABLE</span>
+      </div>
+      <div id="performanceContainer"></div>
+    </section>
+
+    <!-- 1. Evidence Health & Provenance Audit -->
+    <section class="panel" id="evidenceHealthPanel">
+      <div class="panel-header">
+        <h2 class="panel-title">1. Evidence Health &amp; Provenance</h2>
+        <span class="mono muted" id="evidenceUpdateMeta"></span>
+      </div>
+      <div class="grid-4" id="evidenceHealthGrid"></div>
+      <details id="evidenceDetails">
+        <summary>Quality Checks Breakdown, Provisional Periods, Missing Inputs &amp; Hashes</summary>
+        <div id="evidenceDetailsBody"></div>
+      </details>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>

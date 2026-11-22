@@ -1,0 +1,49 @@
+name: Daily IREDA Cockpit Update
+
+on:
+  schedule:
+    # 08:15 AM IST (Mon-Fri) — Pre-market overnight US / Brent / Gold / FX check
+    - cron: '45 2 * * 1-5'
+    # 04:15 PM IST (Mon-Fri) — Post-NSE close + automatic prediction grading
+    - cron: '45 10 * * 1-5'
+    # 06:00 PM IST (Sunday) — Weekly candle & trendline reset
+    - cron: '30 12 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-cockpit-update
+  cancel-in-progress: false
+
+jobs:
+  update-cockpit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run daily market update and auto-grade predictions
+        run: python3 scripts/daily_update.py
+
+      - name: Commit and push updated cockpit state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cockpit_state.json daily_ledger.jsonl daily_history.jsonl
+          if git diff --staged --quiet; then
+            echo "No state changes to commit."
+            exit 0
+          fi
+          TS=$(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M IST')
+          git commit -m "chore(cockpit): auto-update macro lights & ledger (${TS})"
+          git pull --rebase origin main
+          git push origin main

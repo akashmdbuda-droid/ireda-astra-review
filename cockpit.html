@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>IREDA Daily Cockpit — 5-Light Macro &amp; Prediction Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%230b1220'/><circle cx='8' cy='8' r='4.5' fill='%2322c55e'/></svg>" />
+  <style>
+    :root {
+      --bg: #070d19;
+      --card: #0f172a;
+      --card-2: #0b1220;
+      --border: #1e293b;
+      --fg: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --purple: #a855f7;
+    }
+    body.light {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --card-2: #f8fafc;
+      --border: #cbd5e1;
+      --fg: #0f172a;
+      --muted: #475569;
+      --accent: #0284c7;
+      --green: #16a34a;
+      --amber: #d97706;
+      --red: #dc2626;
+      --purple: #7c3aed;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .muted { color: var(--muted); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .topbar {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    .nav-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+    .btn {
+      background: var(--card-2); color: var(--fg); border: 1px solid var(--border);
+      border-radius: 7px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn.active { background: var(--accent); color: #020617; border-color: var(--accent); }
+
+    /* Hero Banner */
+    .hero { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+    .signal-pill {
+      display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px;
+      border-radius: 999px; font-weight: 800; font-size: 14px; letter-spacing: 0.02em;
+      border: 1.5px solid var(--green); color: var(--green); background: rgba(34,197,94,0.1);
+    }
+    .signal-pill.warning { border-color: var(--amber); color: var(--amber); background: rgba(245,158,11,0.12); }
+    .signal-pill.error { border-color: var(--red); color: var(--red); background: rgba(239,68,68,0.14); }
+    .kpis { display: flex; flex-wrap: wrap; gap: 10px; }
+    .kpi {
+      background: var(--card-2); border: 1px solid var(--border); border-radius: 9px;
+      padding: 8px 13px; text-align: center; min-width: 92px;
+    }
+    .kpi-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .kpi-val { font-size: 18px; font-weight: 800; margin-top: 2px; }
+
+    /* 5 Traffic Lights */
+    .sec-head {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+      margin-bottom: 10px; font-size: 12px;
+    }
+    .sec-title { font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .lights-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+    @media (max-width: 960px) { .lights-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { .lights-grid { grid-template-columns: 1fr; } }
+    .light-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 11px;
+      padding: 12px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; gap: 6px;
+      transition: border-color 140ms ease, transform 140ms ease;
+    }
+    .light-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .light-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .light-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; font-weight: 700; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px;
+      border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid var(--border);
+    }
+    .badge.GREEN, .badge.HIT { color: var(--green); border-color: var(--green); }
+    .badge.AMBER, .badge.PENDING { color: var(--amber); border-color: var(--amber); }
+    .badge.RED, .badge.MISS { color: var(--red); border-color: var(--red); }
+    .badge.EXPIRED { color: var(--muted); border-color: var(--border); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+    .light-val { font-size: 18px; font-weight: 800; }
+    .light-note { font-size: 12px; color: var(--muted); }
+    .light-rule { font-size: 11px; color: var(--red); padding-top: 6px; border-top: 1px solid var(--border); }
+
+    /* IREDA Ladder + Local Position */
+    .ladder { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+    @media (max-width: 720px) { .ladder { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .rung {
+      background: var(--card-2); border: 1px solid var(--border); border-radius: 9px;
+      padding: 9px 8px; text-align: center;
+    }
+    .rung.stop { border-color: var(--red); }
+    .rung.sup { border-color: var(--green); }
+    .rung.now { background: rgba(56,189,248,0.14); border-color: var(--accent); }
+    .rung-p { font-weight: 800; font-size: 14px; }
+    .rung-l { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .pos-bar {
+      margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px;
+    }
+    .pos-inputs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .pos-inputs input {
+      width: 98px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--card-2); color: var(--fg); font-size: 12px;
+    }
+
+    /* Expandable Chart Drawer */
+    .drawer { display: none; }
+    .drawer.open { display: block; }
+    .canvas-box { width: 100%; height: 360px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-top: 8px; }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    /* Bottom Grid */
+    .two-col { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px; }
+    @media (max-width: 880px) { .two-col { grid-template-columns: 1fr; } }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .cat-item {
+      background: var(--card-2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 10px; font-size: 12px; margin-bottom: 8px;
+    }
+    .warn-strip {
+      display: none; padding: 8px 12px; border-radius: 8px; font-size: 12px;
+      background: rgba(245,158,11,0.12); border: 1px solid var(--amber); color: var(--amber);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Top Bar -->
+    <div class="topbar">
+      <div>
+        <div style="font-size:17px;font-weight:800;letter-spacing:-0.01em;">IREDA Daily Cockpit</div>
+        <div class="mono muted" style="font-size:11px;" id="metaLine">Loading cockpit_state.json…</div>
+      </div>
+      <div class="nav-links">
+        <a class="btn" href="./index.html">Full Astra Dashboard</a>
+        <a class="btn" href="./review.html">Astra Bundle</a>
+        <button class="btn" id="btnTheme">Light / Dark</button>
+      </div>
+    </div>
+
+    <div id="staleWarn" class="warn-strip"></div>
+
+    <!-- 1. THREE-SECOND VERDICT BANNER -->
+    <section class="card hero">
+      <div style="flex:1;min-width:260px;">
+        <div id="signalPill" class="signal-pill">● LOADING…</div>
+        <p id="signalSummary" style="margin:8px 0 0;font-size:13px;color:var(--muted);max-width:640px;">—</p>
+      </div>
+      <div class="kpis">
+        <div class="kpi">
+          <div class="kpi-lbl">Macro Score</div>
+          <div id="kpiScore" class="kpi-val mono">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">Red Alarms</div>
+          <div id="kpiReds" class="kpi-val mono">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">Hit Rate</div>
+          <div id="kpiHit" class="kpi-val mono">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. THE 5 TRAFFIC LIGHTS -->
+    <section>
+      <div class="sec-head">
+        <span class="sec-title">The 5 Macro Leading Lights (Click Any Card for Trendline Chart)</span>
+        <span class="muted"><strong>0–1 RED</strong> = Hold &amp; Ride · <strong style="color:var(--amber)">2 RED</strong> = Arm Stop · <strong style="color:var(--red)">3+ RED</strong> = Exit</span>
+      </div>
+      <div id="lightsGrid" class="lights-grid"></div>
+    </section>
+
+    <!-- EXPANDABLE TRENDLINE CHART DRAWER (Hidden until clicked) -->
+    <section id="chartDrawer" class="card drawer">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;">
+        <div>
+          <strong id="drawerTitle">—</strong>
+          <span id="drawerMeta" class="mono muted" style="font-size:12px;margin-left:8px;"></span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+          <button class="btn tf-btn active" data-tf="1d">Daily</button>
+          <button class="btn tf-btn" data-tf="1wk">Weekly</button>
+          <button class="btn" id="btnDrawTL">+ Draw Trendline</button>
+          <button class="btn" id="btnClearTL">Clear</button>
+          <button class="btn" id="btnCloseDrawer">Close ✕</button>
+        </div>
+      </div>
+      <div id="drawerPills" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;"></div>
+      <div id="drawerOhlc" class="mono muted" style="font-size:11.5px;margin-top:6px;">Hover chart for OHLC / EMA / RSI readout</div>
+      <div class="canvas-box"><canvas id="trendCanvas"></canvas></div>
+    </section>
+
+    <!-- 3. IREDA STRUCTURE & OPTIONAL BROWSER-LOCAL POSITION CALCULATOR -->
+    <section class="card">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+          <strong style="font-size:15px;">IREDA.NS Price Ladder</strong>
+          <span id="iredaChips" class="mono muted" style="font-size:12px;">—</span>
+        </div>
+        <button class="btn" id="btnOpenIredaChart">View IREDA Trendlines</button>
+      </div>
+
+      <div class="ladder">
+        <div class="rung stop">
+          <div class="rung-p mono" style="color:var(--red)">₹119.50</div>
+          <div class="rung-l">Hard Exit Stop</div>
+        </div>
+        <div class="rung sup">
+          <div class="rung-p mono" style="color:var(--green)">₹121 – ₹125</div>
+          <div class="rung-l">Breakout Support (200 EMA)</div>
+        </div>
+        <div class="rung now">
+          <div id="ladderNow" class="rung-p mono" style="color:var(--accent)">₹—</div>
+          <div class="rung-l">Latest NSE Close</div>
+        </div>
+        <div class="rung">
+          <div class="rung-p mono">₹142.85</div>
+          <div class="rung-l">Apr 2026 Peak</div>
+        </div>
+        <div class="rung">
+          <div class="rung-p mono">₹149.48</div>
+          <div class="rung-l">52-Week High</div>
+        </div>
+      </div>
+
+      <!-- 100% Browser-Local Position Calculator (Zero personal data in GitHub) -->
+      <div class="pos-bar">
+        <div class="pos-inputs">
+          <span class="muted" style="font-weight:600;">Private Position (saved only in your browser):</span>
+          <label class="muted">Qty <input id="posQty" type="number" min="0" step="1" placeholder="e.g. 1000" class="mono" /></label>
+          <label class="muted">Avg ₹ <input id="posAvg" type="number" min="0" step="0.05" placeholder="e.g. 115" class="mono" /></label>
+          <button class="btn" id="btnClearPos">Clear</button>
+        </div>
+        <div id="posOut" class="mono" style="font-weight:700;">—</div>
+      </div>
+    </section>
+
+    <!-- 4. AUTO-GRADED PREDICTION TRACKER + CATALYSTS & DAILY HISTORY -->
+    <section class="two-col">
+      <!-- Auto-Graded Prediction Ledger -->
+      <div class="card">
+        <div class="sec-head">
+          <span class="sec-title">Auto-Graded Prediction vs. Reality Ledger</span>
+          <span id="predSummary" class="mono muted">—</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Logged / Due</th>
+                <th>Asset &amp; Prediction</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="predBody"></tbody>
+          </table>
+        </div>
+
+        <div class="sec-head" style="margin-top:16px;">
+          <span class="sec-title">Recent Daily Log (Auto-Recorded by GitHub Actions)</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>IREDA</th>
+                <th>RSI</th>
+                <th>Score</th>
+                <th>Reds</th>
+                <th>Signal</th>
+              </tr>
+            </thead>
+            <tbody id="histBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Upcoming Macro Catalysts & Daily Rhythm -->
+      <div class="card">
+        <div class="sec-head">
+          <span class="sec-title">Upcoming Macro Catalysts</span>
+        </div>
+        <div id="catList"></div>
+
+        <div class="sec-head" style="margin-top:14px;">
+          <span class="sec-title">Automated Run Schedule (IST)</span>
+        </div>
+        <div class="cat-item mono" style="line-height:1.7;">
+          <div><strong>08:15 AM (Mon–Fri)</strong> · Overnight US / Oil / FX</div>
+          <div><strong>04:15 PM (Mon–Fri)</strong> · NSE Close + Auto-Grade</div>
+          <div><strong>06:00 PM (Sun)</strong> · Weekly Trendline Reset</div>
+        </div>
+        <div class="muted" style="font-size:11.5px;margin-top:8px;">
+          Market-only read-only tracker powered by Yahoo Finance via GitHub Actions. Not personalized SEBI-registered investment advice.
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      let STATE = null;
+      const ui = {
+        selectedAsset: null,
+        tf: "1d",
+        drawMode: false,
+        pendingPt: null,
+        hover: null,
+        customTLs: {},
+      };
+
+      const canvas = document.getElementById("trendCanvas");
+      const ctx = canvas.getContext("2d");
+
+      function fmtSign(v) {
+        if (v === null || v === undefined || Number.isNaN(v)) return "";
+        return (v >= 0 ? "+" : "") + Number(v).toFixed(2) + "%";
+      }
+
+      function dotCol(st) {
+        return st === "GREEN" ? "var(--green)" : st === "RED" ? "var(--red)" : "var(--amber)";
+      }
+
+      function loadLocalPos() {
+        try {
+          const raw = localStorage.getItem("ireda_cockpit_local_pos_v1");
+          if (raw) {
+            const p = JSON.parse(raw);
+            if (p.qty) document.getElementById("posQty").value = p.qty;
+            if (p.avg) document.getElementById("posAvg").value = p.avg;
+          }
+        } catch (e) {}
+      }
+
+      function renderLocalPos() {
+        const qty = parseFloat(document.getElementById("posQty").value);
+        const avg = parseFloat(document.getElementById("posAvg").value);
+        try { localStorage.setItem("ireda_cockpit_local_pos_v1", JSON.stringify({ qty: qty || "", avg: avg || "" })); } catch (e) {}
+        const out = document.getElementById("posOut");
+        if (!STATE || !qty || !avg) {
+          out.textContent = "Enter Qty & Avg to compute P&L locally";
+          out.style.color = "var(--muted)";
+          return;
+        }
+        const cmp = STATE.ireda.last;
+        const cost = qty * avg;
+        const val = qty * cmp;
+        const pnl = val - cost;
+        const pct = (pnl / cost) * 100;
+        const pnlL = pnl / 1e5;
+        out.textContent = `Value: ₹${(val/1e5).toFixed(2)}L · Open P&L: ${pnl >= 0 ? "+" : ""}₹${pnlL.toFixed(2)}L (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%)`;
+        out.style.color = pnl >= 0 ? "var(--green)" : "var(--red)";
+      }
+
+      function renderDrawerPills() {
+        const box = document.getElementById("drawerPills");
+        if (!box || !STATE) return;
+        const order = [
+          ["IREDA", "IREDA"],
+          ["BRENT", "Brent"],
+          ["IN10Y_ETF", "IN 10Y"],
+          ["USDINR", "USD/INR"],
+          ["INDIAVIX", "VIX"],
+          ["US10Y", "US 10Y"],
+          ["GOLD", "Gold"],
+          ["NDX", "Nasdaq"],
+          ["DXY", "DXY"],
+          ["NIFTY", "Nifty"],
+        ];
+        box.innerHTML = "";
+        for (const [k, lbl] of order) {
+          if (!STATE.charts[k]) continue;
+          const b = document.createElement("button");
+          b.className = "btn" + (ui.selectedAsset === k ? " active" : "");
+          b.style.padding = "3px 8px";
+          b.style.fontSize = "11px";
+          b.textContent = lbl;
+          b.addEventListener("click", () => openChart(k));
+          box.appendChild(b);
+        }
+      }
+
+      function openChart(assetKey) {
+        ui.selectedAsset = assetKey;
+        ui.pendingPt = null;
+        ui.drawMode = false;
+        document.getElementById("chartDrawer").classList.add("open");
+        document.getElementById("btnDrawTL").classList.remove("active");
+        document.getElementById("btnDrawTL").textContent = "+ Draw Trendline";
+        renderLights();
+        renderDrawerPills();
+        drawChart();
+      }
+
+      function renderLights() {
+        const grid = document.getElementById("lightsGrid");
+        grid.innerHTML = "";
+        for (const l of STATE.lights) {
+          const card = document.createElement("div");
+          card.className = "light-card" + (ui.selectedAsset === l.id ? " selected" : "");
+          card.innerHTML = `
+            <div class="light-top">
+              <span>${l.title}</span>
+              <span class="badge ${l.status} mono"><span class="dot" style="background:${dotCol(l.status)}"></span>${l.status}</span>
+            </div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px;">
+              <span class="light-val mono">${l.value}</span>
+              <span class="mono" style="font-size:11.5px;color:${l.chg_pct >= 0 ? "var(--green)" : "var(--red)"}">${l.chg_prefix || ""}${fmtSign(l.chg_pct)}</span>
+            </div>
+            <div class="light-note">${l.note}</div>
+            <div class="light-rule mono">${l.red_rule}</div>
+          `;
+          card.addEventListener("click", () => openChart(l.id));
+          grid.appendChild(card);
+        }
+      }
+
+      function drawChart() {
+        if (!STATE || !ui.selectedAsset) return;
+        const ch = STATE.charts[ui.selectedAsset];
+        if (!ch || !ch[ui.tf]) return;
+        const tfd = ch[ui.tf];
+        const bars = tfd.bars;
+        const snap = STATE.snapshots[ui.selectedAsset];
+        document.getElementById("drawerTitle").textContent = `${ch.name} (${ui.tf === "1d" ? "Daily" : "Weekly"} Trendlines)`;
+        document.getElementById("drawerMeta").textContent = `Last: ${ch.unit === "%" ? snap.last + "%" : ch.unit + snap.last} · RSI: ${ui.tf === "1d" ? snap.rsi : snap.w_rsi}`;
+
+        const box = canvas.parentElement;
+        const dpr = window.devicePixelRatio || 1;
+        const w = box.clientWidth, h = box.clientHeight;
+        if (!w || !h) return;
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const cs = getComputedStyle(document.body);
+        const bg = cs.getPropertyValue("--card").trim();
+        const bg2 = cs.getPropertyValue("--card-2").trim();
+        const border = cs.getPropertyValue("--border").trim();
+        const fg = cs.getPropertyValue("--fg").trim();
+        const muted = cs.getPropertyValue("--muted").trim();
+
+        const padL = 52, padR = 112, padT = 12, padB = 22, gap = 10, rsiH = 68;
+        const mainH = h - padT - padB - gap - rsiH;
+        const mainY0 = padT, mainY1 = mainY0 + mainH;
+        const rsiY0 = mainY1 + gap, rsiY1 = rsiY0 + rsiH;
+        const plotW = w - padL - padR;
+
+        const n = bars.length;
+        const proj = Math.max(6, Math.round(n * 0.06));
+        const slots = n + proj;
+        let ymin = Infinity, ymax = -Infinity;
+        for (const b of bars) { if (b[3] < ymin) ymin = b[3]; if (b[2] > ymax) ymax = b[2]; }
+        const ypad = Math.max((ymax - ymin) * 0.08, 1e-6);
+        ymin -= ypad; ymax += ypad;
+
+        const xOf = (i) => padL + ((i + 0.5) / slots) * plotW;
+        const yOf = (v) => mainY1 - ((v - ymin) / (ymax - ymin)) * mainH;
+        const yRsi = (r) => rsiY1 - ((r - 10) / 82) * rsiH;
+
+        ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = bg2; ctx.fillRect(padL, rsiY0, plotW, rsiH);
+
+        ctx.strokeStyle = border; ctx.lineWidth = 1;
+        ctx.font = "10.5px ui-monospace, monospace"; ctx.fillStyle = muted;
+        for (let k = 0; k <= 4; k++) {
+          const v = ymin + (k / 4) * (ymax - ymin), py = yOf(v);
+          ctx.beginPath(); ctx.moveTo(padL, py); ctx.lineTo(padL + plotW, py); ctx.stroke();
+          ctx.textAlign = "right"; ctx.textBaseline = "middle";
+          ctx.fillText(v.toFixed(ch.dec), padL - 6, py);
+        }
+        for (let k = 0; k < 5; k++) {
+          const idx = Math.min(n - 1, Math.round((k / 4) * (n - 1)));
+          const px = xOf(idx);
+          ctx.beginPath(); ctx.moveTo(px, mainY0); ctx.lineTo(px, mainY1); ctx.stroke();
+          ctx.textAlign = "center"; ctx.textBaseline = "top";
+          ctx.fillText(bars[idx][0].slice(2), px, rsiY1 + 4);
+        }
+
+        // Candles
+        ctx.save(); ctx.beginPath(); ctx.rect(padL, mainY0, plotW, mainH); ctx.clip();
+        const bw = Math.max(1.8, Math.min(7, (plotW / slots) * 0.68));
+        for (let i = 0; i < n; i++) {
+          const [, o, hi, lo, c] = bars[i];
+          const px = xOf(i), col = c >= o ? "#22c55e" : "#ef4444";
+          ctx.strokeStyle = col; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(px, yOf(hi)); ctx.lineTo(px, yOf(lo)); ctx.stroke();
+          ctx.fillStyle = col;
+          ctx.fillRect(px - bw / 2, yOf(Math.max(o, c)), bw, Math.max(1.2, yOf(Math.min(o, c)) - yOf(Math.max(o, c))));
+        }
+
+        // EMAs
+        for (const [ci, col, lw] of [[5, "#38bdf8", 1.1], [6, "#f59e0b", 1.1], [7, "#a855f7", 1.4]]) {
+          ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath();
+          let s = false;
+          for (let i = 0; i < n; i++) {
+            if (bars[i][ci] === null) continue;
+            const px = xOf(i), py = yOf(bars[i][ci]);
+            if (!s) { ctx.moveTo(px, py); s = true; } else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        }
+
+        // Auto & Custom Trendlines
+        const xEnd = n - 1 + proj;
+        const labels = [];
+        for (const tl of tfd.tls) {
+          const sl = (tl.y2 - tl.y1) / (tl.i2 - tl.i1);
+          ctx.save(); ctx.strokeStyle = tl.color; ctx.lineWidth = 1.9;
+          if (tl.kind === "res") ctx.setLineDash([5, 4]);
+          ctx.beginPath(); ctx.moveTo(xOf(tl.i1), yOf(tl.y1)); ctx.lineTo(xOf(xEnd), yOf(tl.y1 + sl * (xEnd - tl.i1))); ctx.stroke();
+          ctx.setLineDash([]);
+          for (const [pi, pyv] of [[tl.i1, tl.y1], [tl.i2, tl.y2]]) {
+            if (pi < 0) continue;
+            ctx.beginPath(); ctx.arc(xOf(pi), yOf(pyv), 3.3, 0, Math.PI * 2); ctx.fillStyle = tl.color; ctx.fill();
+          }
+          ctx.restore();
+          labels.push({ y: yOf(tl.now), txt: `${tl.label.slice(0, 12)} ${tl.now}`, col: tl.color });
+        }
+
+        const cKey = `${ui.selectedAsset}:${ui.tf}`;
+        for (const ct of (ui.customTLs[cKey] || [])) {
+          const sl = (ct.y2 - ct.y1) / Math.max(0.001, ct.i2 - ct.i1);
+          const nowY = ct.y1 + sl * (n - 1 - ct.i1);
+          ctx.save(); ctx.strokeStyle = "#eab308"; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+          ctx.beginPath(); ctx.moveTo(xOf(ct.i1), yOf(ct.y1)); ctx.lineTo(xOf(xEnd), yOf(ct.y1 + sl * (xEnd - ct.i1))); ctx.stroke();
+          ctx.restore();
+          labels.push({ y: yOf(nowY), txt: `Custom ${nowY.toFixed(ch.dec)}`, col: "#eab308" });
+        }
+
+        if (ui.drawMode && ui.pendingPt && ui.hover) {
+          ctx.save(); ctx.strokeStyle = "#eab308"; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.moveTo(xOf(ui.pendingPt.i), yOf(ui.pendingPt.y)); ctx.lineTo(ui.hover.x, ui.hover.y); ctx.stroke();
+          ctx.restore();
+        }
+        ctx.restore();
+
+        // Right-margin trendline labels
+        labels.push({ y: yOf(bars[n - 1][4]), txt: `Last ${bars[n - 1][4]}`, col: fg });
+        labels.sort((a, b) => a.y - b.y);
+        for (let i = 1; i < labels.length; i++) if (labels[i].y - labels[i - 1].y < 13) labels[i].y = labels[i - 1].y + 13;
+        ctx.font = "600 10px ui-monospace, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        for (const lb of labels) {
+          ctx.fillStyle = lb.col;
+          ctx.fillText(lb.txt, padL + plotW + 5, Math.max(mainY0 + 7, Math.min(mainY1 - 6, lb.y)));
+        }
+
+        // RSI
+        ctx.save(); ctx.beginPath(); ctx.rect(padL, rsiY0, plotW, rsiH); ctx.clip();
+        for (const [lv, col] of [[70, "#ef4444"], [30, "#22c55e"]]) {
+          ctx.strokeStyle = col; ctx.setLineDash([3, 3]); ctx.beginPath();
+          ctx.moveTo(padL, yRsi(lv)); ctx.lineTo(padL + plotW, yRsi(lv)); ctx.stroke();
+        }
+        ctx.setLineDash([]); ctx.strokeStyle = "#a855f7"; ctx.lineWidth = 1.4; ctx.beginPath();
+        let rs = false;
+        for (let i = 0; i < n; i++) {
+          if (bars[i][8] === null) continue;
+          const px = xOf(i), py = yRsi(bars[i][8]);
+          if (!rs) { ctx.moveTo(px, py); rs = true; } else ctx.lineTo(px, py);
+        }
+        ctx.stroke(); ctx.restore();
+        ctx.fillStyle = "#a855f7"; ctx.font = "700 10.5px ui-monospace, monospace";
+        ctx.fillText(`RSI ${bars[n - 1][8] ?? "—"}`, padL + plotW + 5, yRsi(bars[n - 1][8] || 50));
+
+        ctx.strokeStyle = border; ctx.strokeRect(padL, mainY0, plotW, mainH); ctx.strokeRect(padL, rsiY0, plotW, rsiH);
+      }
+
+      function renderAll() {
+        document.getElementById("metaLine").textContent =
+          `Updated ${STATE.updated_at_ist} · IREDA Latest Bar: ${STATE.ireda.last_date} · Market-Only (Zero Personal Data in Repo)`;
+
+        if (STATE.fetch_errors && STATE.fetch_errors.length) {
+          const w = document.getElementById("staleWarn");
+          w.style.display = "block";
+          w.textContent = "Partial feed warning (cached fallback used): " + STATE.fetch_errors.join(" | ");
+        }
+
+        const pill = document.getElementById("signalPill");
+        pill.textContent = `● ${STATE.signal.label}`;
+        pill.className = "signal-pill" + (STATE.signal.tone === "warning" ? " warning" : STATE.signal.tone === "error" ? " error" : "");
+        document.getElementById("signalSummary").textContent = STATE.signal.summary;
+
+        const ks = document.getElementById("kpiScore");
+        ks.textContent = `${STATE.macro_score} / 10`;
+        ks.style.color = STATE.macro_score >= 7 ? "var(--green)" : STATE.macro_score >= 5 ? "var(--amber)" : "var(--red)";
+
+        const kr = document.getElementById("kpiReds");
+        kr.textContent = `${STATE.red_lights} / 5`;
+        kr.style.color = STATE.red_lights >= 2 ? "var(--red)" : "var(--fg)";
+
+        const ps = STATE.prediction_stats;
+        document.getElementById("kpiHit").textContent = ps.hit_rate_pct !== null ? `${ps.hit_rate_pct}%` : `${ps.pending} open`;
+
+        renderLights();
+
+        const ir = STATE.ireda;
+        document.getElementById("ladderNow").textContent = `₹${ir.last.toFixed(2)}`;
+        document.getElementById("iredaChips").textContent =
+          `Close ₹${ir.last.toFixed(2)} (${fmtSign(ir.chg_pct)}) · 200 EMA ₹${ir.e200} · D-RSI ${ir.rsi} · W-RSI ${ir.w_rsi} · ATR ₹${ir.atr14}`;
+
+        document.getElementById("predSummary").textContent =
+          `${ps.hits} Hit · ${ps.misses} Miss · ${ps.pending} Pending` + (ps.hit_rate_pct !== null ? ` (${ps.hit_rate_pct}%)` : "");
+
+        const pb = document.getElementById("predBody");
+        pb.innerHTML = "";
+        for (const p of STATE.predictions) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="mono muted" style="white-space:nowrap;"><div>${p.logged_date.slice(5)}</div><div style="color:var(--fg)">Due ${p.due_date.slice(5)}</div></td>
+            <td>
+              <div><strong>${p.asset}:</strong> ${p.prediction}</div>
+              <div class="muted" style="font-size:11px;margin-top:2px;">${p.outcome_note || p.rule_text}</div>
+            </td>
+            <td style="white-space:nowrap;"><span class="badge ${p.status} mono">${p.status}</span></td>
+          `;
+          pb.appendChild(tr);
+        }
+
+        const hb = document.getElementById("histBody");
+        hb.innerHTML = "";
+        for (const h of [...STATE.history].reverse().slice(0, 10)) {
+          const tr = document.createElement("tr");
+          tr.className = "mono";
+          const sCol = h.signal === "EXIT_PROTECT" ? "var(--red)" : h.signal === "ALERT_PROTECT" ? "var(--amber)" : "var(--green)";
+          tr.innerHTML = `
+            <td>${h.date}</td>
+            <td>₹${Number(h.ireda_close).toFixed(2)}</td>
+            <td>${h.ireda_rsi ?? "—"}</td>
+            <td>${h.macro_score}/10</td>
+            <td style="color:${h.red_lights >= 2 ? "var(--red)" : "var(--fg)"}">${h.red_lights}/5</td>
+            <td style="color:${sCol};font-weight:700;">${h.signal_label}</td>
+          `;
+          hb.appendChild(tr);
+        }
+
+        const cl = document.getElementById("catList");
+        cl.innerHTML = "";
+        for (const c of STATE.catalysts) {
+          const div = document.createElement("div");
+          div.className = "cat-item";
+          div.innerHTML = `<div class="mono" style="font-weight:700;">${c.date} · ${c.title}</div><div class="muted" style="margin-top:2px;">${c.note}</div>`;
+          cl.appendChild(div);
+        }
+
+        renderLocalPos();
+      }
+
+      // Wire controls
+      document.getElementById("btnTheme").addEventListener("click", () => {
+        document.body.classList.toggle("light");
+        drawChart();
+      });
+      document.getElementById("btnOpenIredaChart").addEventListener("click", () => openChart("IREDA"));
+      document.getElementById("btnCloseDrawer").addEventListener("click", () => {
+        ui.selectedAsset = null;
+        document.getElementById("chartDrawer").classList.remove("open");
+        renderLights();
+      });
+      document.querySelectorAll(".tf-btn").forEach((b) => b.addEventListener("click", () => {
+        ui.tf = b.dataset.tf;
+        document.querySelectorAll(".tf-btn").forEach((x) => x.classList.toggle("active", x.dataset.tf === ui.tf));
+        ui.pendingPt = null;
+        drawChart();
+      }));
+      document.getElementById("btnDrawTL").addEventListener("click", (e) => {
+        ui.drawMode = !ui.drawMode;
+        ui.pendingPt = null;
+        e.target.classList.toggle("active", ui.drawMode);
+        e.target.textContent = ui.drawMode ? "Click 2 Points on Chart…" : "+ Draw Trendline";
+      });
+      document.getElementById("btnClearTL").addEventListener("click", () => {
+        if (ui.selectedAsset) ui.customTLs[`${ui.selectedAsset}:${ui.tf}`] = [];
+        ui.pendingPt = null;
+        drawChart();
+      });
+
+      canvas.addEventListener("mousemove", (e) => {
+        if (!STATE || !ui.selectedAsset) return;
+        const ch = STATE.charts[ui.selectedAsset];
+        const bars = ch[ui.tf].bars;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+        const padL = 52, padR = 112, plotW = rect.width - padL - padR;
+        const n = bars.length, proj = Math.max(6, Math.round(n * 0.06));
+        const idx = Math.max(0, Math.min(n - 1, Math.round(((x - padL) / plotW) * (n + proj) - 0.5)));
+        const b = bars[idx];
+        document.getElementById("drawerOhlc").textContent =
+          `${b[0]}  O:${b[1]} H:${b[2]} L:${b[3]} C:${b[4]}  |  E20:${b[5] ?? "-"} E50:${b[6] ?? "-"} E200:${b[7] ?? "-"}  |  RSI:${b[8] ?? "-"}`;
+        ui.hover = { x, y };
+        if (ui.drawMode && ui.pendingPt) drawChart();
+      });
+
+      canvas.addEventListener("click", (e) => {
+        if (!ui.drawMode || !STATE || !ui.selectedAsset) return;
+        const ch = STATE.charts[ui.selectedAsset];
+        const bars = ch[ui.tf].bars;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+        const padL = 52, padR = 112, padT = 12, padB = 22, gap = 10, rsiH = 68;
+        const mainH = rect.height - padT - padB - gap - rsiH;
+        const plotW = rect.width - padL - padR;
+        if (x < padL || x > padL + plotW || y < padT || y > padT + mainH) return;
+        const n = bars.length, proj = Math.max(6, Math.round(n * 0.06));
+        const idx = Math.max(0, Math.min(n - 1, Math.round(((x - padL) / plotW) * (n + proj) - 0.5)));
+        let ymin = Infinity, ymax = -Infinity;
+        for (const b of bars) { if (b[3] < ymin) ymin = b[3]; if (b[2] > ymax) ymax = b[2]; }
+        const ypad = Math.max((ymax - ymin) * 0.08, 1e-6);
+        ymin -= ypad; ymax += ypad;
+        let val = ymin + ((padT + mainH - y) / mainH) * (ymax - ymin);
+        // Snap to High or Low if close
+        const yOf = (v) => padT + mainH - ((v - ymin) / (ymax - ymin)) * mainH;
+        if (Math.abs(y - yOf(bars[idx][2])) < 14) val = bars[idx][2];
+        else if (Math.abs(y - yOf(bars[idx][3])) < 14) val = bars[idx][3];
+
+        if (!ui.pendingPt) {
+          ui.pendingPt = { i: idx, y: val };
+        } else {
+          if (idx !== ui.pendingPt.i) {
+            const p1 = ui.pendingPt.i < idx ? ui.pendingPt : { i: idx, y: val };
+            const p2 = ui.pendingPt.i < idx ? { i: idx, y: val } : ui.pendingPt;
+            const k = `${ui.selectedAsset}:${ui.tf}`;
+            ui.customTLs[k] = ui.customTLs[k] || [];
+            ui.customTLs[k].push({ i1: p1.i, y1: p1.y, i2: p2.i, y2: p2.y });
+          }
+          ui.pendingPt = null;
+          ui.drawMode = false;
+          const b = document.getElementById("btnDrawTL");
+          b.classList.remove("active");
+          b.textContent = "+ Draw Trendline";
+        }
+        drawChart();
+      });
+
+      document.getElementById("posQty").addEventListener("input", renderLocalPos);
+      document.getElementById("posAvg").addEventListener("input", renderLocalPos);
+      document.getElementById("btnClearPos").addEventListener("click", () => {
+        document.getElementById("posQty").value = "";
+        document.getElementById("posAvg").value = "";
+        renderLocalPos();
+      });
+
+      window.addEventListener("resize", drawChart);
+      loadLocalPos();
+
+      fetch("./cockpit_state.json?t=" + Date.now())
+        .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then((data) => { STATE = data; renderAll(); })
+        .catch((err) => {
+          document.getElementById("metaLine").textContent = "Failed to load cockpit_state.json: " + err.message;
+        });
+    })();
+  </script>
+</body>
+</html>

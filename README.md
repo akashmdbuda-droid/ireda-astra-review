@@ -26,3 +26,19 @@
 - **`run_status: diagnostic_only` / `evidence_status: insufficient_data`:** Scenarios stay `ABSTAINED / FAIL-CLOSED` because historical Dhan-vs-Yahoo reconciliation flagged `17` issues (`1` unadjusted dividend, `9` historical OHLC price differences on `2024-01-15`/`2025-03-18`/`2025-05-02`, `6` session mismatches, and `missing_completed_interval` on `2026-11-13 15:15`).
 - **EOD Daily vs Provisional Candle:** Dhan `/v2/charts/historical` ends at `2026-11-12` (`₹119.85`), while Dhan `/v2/charts/intraday` stops at `15:00` (`₹118.30`). Live quote & provisional Daily bar reflect `₹118.30`.
 - **Forecast Calibration (`insufficient_sample`):** Sample sizes (`n=15` for `1D`, `n=12` for `5D`, `n=11` for `20D`) are below `DEFAULT_MIN_CALIBRATION_SAMPLES = 30`, so calibrated probabilities remain `probability unavailable`.
+
+---
+
+## Automated Daily Macro Cockpit (`cockpit.html`)
+
+Alongside the frozen Astra review bundle above, this repository also serves a live, automated 1-screen **Daily Macro Cockpit** on GitHub Pages at [`./cockpit.html`](cockpit.html) (strictly read-only & market-only — zero personal holdings or broker credentials are stored in the repository; the optional P&L calculator saves inputs only in browser `localStorage`).
+
+| File | Purpose |
+| :--- | :--- |
+| [`cockpit.html`](cockpit.html) | Simplified 1-screen dashboard: 3-second action signal (`HOLD & RIDE` / `ALERT` / `EXIT`), 5 macro traffic lights (`Brent`, `India 10Y Bond ETF`, `USD/INR`, `India VIX`, `Global Risk`), expandable Daily/Weekly trendline chart drawer, IREDA price ladder, and auto-graded prediction scorecard |
+| [`scripts/daily_update.py`](scripts/daily_update.py) | Zero-dependency Python 3 updater that fetches Yahoo Finance Daily/Weekly OHLCV for 10 assets, computes EMAs/RSI/ATR & structural trendlines, evaluates the 5 lights, auto-grades pending predictions, and writes `cockpit_state.json` |
+| [`cockpit_state.json`](cockpit_state.json) | Auto-updated market snapshot & chart payload consumed by `cockpit.html` |
+| [`daily_ledger.jsonl`](daily_ledger.jsonl) | Falsifiable prediction-vs-reality ledger automatically graded (`HIT` / `MISS` / `EXPIRED`) on subsequent daily bars |
+| [`daily_history.jsonl`](daily_history.jsonl) | Append-only daily log of IREDA close, RSI, Macro Score, Red Lights, and Action Signal |
+| [`.github/workflows/daily_cockpit.yml`](.github/workflows/daily_cockpit.yml) | Scheduled GitHub Actions runner: **08:15 AM IST** (Mon–Fri pre-market), **04:15 PM IST** (Mon–Fri post-NSE close & grading), **06:00 PM IST** (Sunday weekly reset), plus manual `workflow_dispatch` |
+

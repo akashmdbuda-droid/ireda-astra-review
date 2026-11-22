@@ -140,6 +140,28 @@
     .canvas-box { width: 100%; height: 360px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-top: 8px; }
     canvas { display: block; width: 100%; height: 100%; }
 
+    /* Master Synchronized Timeline */
+    .master-controls {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .pill-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+    .pill-btn {
+      background: var(--card-2); color: var(--muted); border: 1px solid var(--border);
+      border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .pill-btn:hover { border-color: var(--accent); color: var(--fg); }
+    .pill-btn.active { background: var(--accent); color: #020617; border-color: var(--accent); }
+    .master-readout {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+      padding: 7px 10px; border-radius: 8px; background: var(--card-2); border: 1px solid var(--border);
+      font-size: 11.5px; margin-bottom: 8px; min-height: 34px;
+    }
+    .master-canvas-box {
+      width: 100%; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+      cursor: crosshair; touch-action: pan-y;
+    }
+
     /* Bottom Grid */
     .two-col { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px; }
     @media (max-width: 880px) { .two-col { grid-template-columns: 1fr; } }
@@ -269,7 +291,40 @@
       </div>
     </section>
 
-    <!-- 4. AUTO-GRADED PREDICTION TRACKER + CATALYSTS & DAILY HISTORY -->
+    <!-- 4. MASTER SYNCHRONIZED TIMELINE (VISUAL PATTERN DISCOVERY) -->
+    <section class="card" id="masterSection">
+      <div class="sec-head" style="margin-bottom:8px;">
+        <div>
+          <span class="sec-title">Master Synchronized Timeline (Real Prices &amp; Fixed Red Ceilings)</span>
+          <span class="muted" style="margin-left:8px;font-size:11.5px;">Hover to sweep all assets · Click to pin a date</span>
+        </div>
+        <div class="pill-row">
+          <button class="pill-btn master-mode active" data-mode="stacked">Stacked Tracks</button>
+          <button class="pill-btn master-mode" data-mode="overlay">Pair Overlay</button>
+          <span class="muted" style="margin:0 2px;">|</span>
+          <button class="pill-btn master-range" data-range="65">3M</button>
+          <button class="pill-btn master-range" data-range="130">6M</button>
+          <button class="pill-btn master-range active" data-range="260">1Y</button>
+        </div>
+      </div>
+
+      <div class="master-controls">
+        <div id="masterTrackPills" class="pill-row"></div>
+        <div class="pill-row">
+          <button class="pill-btn active" id="btnMasterGuides" title="Highlight IREDA's highest & lowest dates straight down all tracks">Turning Guides</button>
+          <button class="pill-btn" id="btnMasterInvert" style="display:none;" title="Flip right macro axis upside-down for inverse correlation inspection">Invert Macro Axis</button>
+          <button class="pill-btn" id="btnMasterUnpin" style="display:none;">Unpin Date ✕</button>
+        </div>
+      </div>
+
+      <div id="masterReadout" class="master-readout mono">Loading synchronized series…</div>
+      <div id="masterCanvasBox" class="master-canvas-box"><canvas id="masterCanvas"></canvas></div>
+      <div class="muted" style="font-size:11px;margin-top:6px;">
+        Red shading marks breaches of fixed macro ceilings/floors (e.g., Brent &gt; $95 &amp; $100 cap, VIX &gt; 18.44, USD/INR &gt; ₹94.50, IN 10Y &lt; ₹29.40). Use visual coincidences to form hypotheses — test them forward in the ledger below.
+      </div>
+    </section>
+
+    <!-- 5. AUTO-GRADED PREDICTION TRACKER + CATALYSTS & DAILY HISTORY -->
     <section class="two-col">
       <!-- Auto-Graded Prediction Ledger -->
       <div class="card">
@@ -678,12 +733,658 @@
         }
 
         renderLocalPos();
+        renderMasterPills();
+        drawMaster();
       }
+
+      // ===== MASTER SYNCHRONIZED TIMELINE =====
+      const MASTER_DRIVER_ORDER = ["BRENT", "IN10Y_ETF", "USDINR", "INDIAVIX", "US10Y", "GOLD", "NDX", "DXY", "NIFTY"];
+      const MASTER_TRACKS = {
+        IREDA:     { label: "IREDA.NS",      short: "IREDA",   unit: "₹", dec: 2, color: "#38bdf8", redLine: 119.50, redDir: "below", redLbl: "₹119.5 Stop",  refLine: 142.85, refLbl: "₹142.9 Peak", refColor: "#94a3b8", showEma200: true },
+        BRENT:     { label: "Brent Crude",   short: "Brent",   unit: "$", dec: 2, color: "#f97316", redLine: 95.0,   redDir: "above", redLbl: "$95 Red",      refLine: 100.0,  refLbl: "$100 Cap",    refColor: "#f43f5e", invDefault: true },
+        IN10Y_ETF: { label: "India 10Y ETF", short: "IN 10Y",  unit: "₹", dec: 2, color: "#22c55e", redLine: 29.40,  redDir: "below", redLbl: "₹29.40 Red",   refLine: 30.00,  refLbl: "₹30.00 Lid",  refColor: "#22c55e", invDefault: false },
+        USDINR:    { label: "USD / INR",     short: "USD/INR", unit: "₹", dec: 2, color: "#eab308", redLine: 94.50,  redDir: "above", redLbl: "₹94.50 Red",   refLine: 93.50,  refLbl: "₹93.50 Neck", refColor: "#94a3b8", invDefault: true },
+        INDIAVIX:  { label: "India VIX",     short: "VIX",     unit: "",  dec: 2, color: "#f43f5e", redLine: 18.44,  redDir: "above", redLbl: "18.44 Red",    refLine: 15.50,  refLbl: "15.5 Calm",   refColor: "#22c55e", invDefault: true },
+        US10Y:     { label: "US 10Y Yield",  short: "US 10Y",  unit: "%", dec: 2, color: "#a855f7", redLine: 5.15,   redDir: "above", redLbl: "5.15% Red",    refLine: 4.85,   refLbl: "4.85% Ease",  refColor: "#22c55e", invDefault: true },
+        GOLD:      { label: "COMEX Gold",    short: "Gold",    unit: "$", dec: 0, color: "#facc15", redLine: 3400,   redDir: "below", redLbl: "$3,400 Shelf", refLine: 3650,   refLbl: "$3,650 Ref",  refColor: "#94a3b8", invDefault: false },
+        NDX:       { label: "Nasdaq 100",    short: "Nasdaq",  unit: "",  dec: 0, color: "#ec4899", redLine: 24800,  redDir: "below", redLbl: "24.8k Floor",  refLine: null,   refLbl: "",            refColor: "#94a3b8", invDefault: false },
+        DXY:       { label: "DXY Dollar",    short: "DXY",     unit: "",  dec: 2, color: "#14b8a6", redLine: 105.0,  redDir: "above", redLbl: "105.0 Red",    refLine: null,   refLbl: "",            refColor: "#94a3b8", invDefault: true },
+        NIFTY:     { label: "Nifty 50",      short: "Nifty",   unit: "",  dec: 0, color: "#60a5fa", redLine: null,   redDir: null,    redLbl: "",             refLine: null,   refLbl: "",            refColor: "#94a3b8", invDefault: false },
+      };
+
+      const master = {
+        mode: "stacked",
+        range: 260,
+        activeDrivers: ["BRENT", "IN10Y_ETF", "USDINR", "INDIAVIX", "US10Y", "GOLD"],
+        overlayKey: "BRENT",
+        invertOverlay: true,
+        showGuides: true,
+        hoverIdx: null,
+        pinnedIdx: null,
+        cache: null,
+        layout: null,
+      };
+      const mCanvas = document.getElementById("masterCanvas");
+      const mCtx = mCanvas.getContext("2d");
+
+      function fmtMasterVal(key, v) {
+        if (v === null || v === undefined || Number.isNaN(v)) return "—";
+        const cfg = MASTER_TRACKS[key];
+        const num = cfg.dec === 0 ? Math.round(v).toLocaleString("en-US") : Number(v).toFixed(cfg.dec);
+        if (cfg.unit === "%") return num + "%";
+        return cfg.unit + num;
+      }
+
+      function isRedBreach(cfg, v) {
+        if (cfg.redLine === null || cfg.redLine === undefined || v === null || v === undefined) return false;
+        return cfg.redDir === "above" ? v > cfg.redLine : v < cfg.redLine;
+      }
+
+      function buildMasterData() {
+        if (!STATE || !STATE.charts || !STATE.charts.IREDA) return null;
+        const irBars = STATE.charts.IREDA["1d"].bars;
+        if (!irBars || !irBars.length) return null;
+        let commonStart = irBars[0][0];
+        for (const k of MASTER_DRIVER_ORDER) {
+          const tb = STATE.charts[k] && STATE.charts[k]["1d"] && STATE.charts[k]["1d"].bars;
+          if (tb && tb.length && tb[0][0] > commonStart) commonStart = tb[0][0];
+        }
+        const alignedIr = irBars.filter((b) => b[0] >= commonStart);
+        const slicedIr = alignedIr.slice(-master.range);
+        const dates = slicedIr.map((b) => b[0]);
+        const series = {
+          IREDA: slicedIr.map((b) => b[4]),
+          IREDA_E200: slicedIr.map((b) => b[7]),
+        };
+        for (const k of MASTER_DRIVER_ORDER) {
+          const tb = (STATE.charts[k] && STATE.charts[k]["1d"] && STATE.charts[k]["1d"].bars) || [];
+          const vals = [];
+          let j = 0;
+          for (const d of dates) {
+            while (j + 1 < tb.length && tb[j + 1][0] <= d) j++;
+            vals.push(tb.length && tb[j][0] <= d ? tb[j][4] : null);
+          }
+          series[k] = vals;
+        }
+        let maxIdx = 0, minIdx = 0;
+        for (let i = 1; i < series.IREDA.length; i++) {
+          if (series.IREDA[i] > series.IREDA[maxIdx]) maxIdx = i;
+          if (series.IREDA[i] < series.IREDA[minIdx]) minIdx = i;
+        }
+        return { dates, series, maxIdx, minIdx };
+      }
+
+      function renderMasterPills() {
+        const box = document.getElementById("masterTrackPills");
+        if (!box || !STATE) return;
+        box.innerHTML = "";
+        const hint = document.createElement("span");
+        hint.className = "muted";
+        hint.style.fontSize = "11px";
+        hint.style.marginRight = "4px";
+        hint.textContent = master.mode === "stacked" ? "Tracks:" : "Compare IREDA vs:";
+        box.appendChild(hint);
+
+        for (const k of MASTER_DRIVER_ORDER) {
+          if (!STATE.charts[k]) continue;
+          const cfg = MASTER_TRACKS[k];
+          const b = document.createElement("button");
+          const isOn = master.mode === "stacked"
+            ? master.activeDrivers.includes(k)
+            : master.overlayKey === k;
+          b.className = "pill-btn" + (isOn ? " active" : "");
+          b.textContent = cfg.short;
+          b.addEventListener("click", () => {
+            if (master.mode === "stacked") {
+              if (master.activeDrivers.includes(k)) {
+                if (master.activeDrivers.length > 1) {
+                  master.activeDrivers = master.activeDrivers.filter((x) => x !== k);
+                }
+              } else {
+                master.activeDrivers = MASTER_DRIVER_ORDER.filter((x) => x === k || master.activeDrivers.includes(x));
+              }
+            } else {
+              master.overlayKey = k;
+              master.invertOverlay = !!cfg.invDefault;
+              document.getElementById("btnMasterInvert").classList.toggle("active", master.invertOverlay);
+            }
+            renderMasterPills();
+            drawMaster();
+          });
+          box.appendChild(b);
+        }
+
+        const invBtn = document.getElementById("btnMasterInvert");
+        invBtn.style.display = master.mode === "overlay" ? "inline-flex" : "none";
+        invBtn.classList.toggle("active", master.invertOverlay);
+        document.getElementById("btnMasterUnpin").style.display = master.pinnedIdx !== null ? "inline-flex" : "none";
+      }
+
+      function renderMasterReadout(data, idx) {
+        const el = document.getElementById("masterReadout");
+        if (!el || !data || !data.dates.length) return;
+        const i = Math.max(0, Math.min(data.dates.length - 1, idx));
+        const d = data.dates[i];
+        const tag = master.pinnedIdx !== null
+          ? `<span style="color:var(--accent);font-weight:800;">PINNED ${d}</span>`
+          : (master.hoverIdx !== null
+            ? `<span style="color:var(--fg);font-weight:800;">${d}</span>`
+            : `<span style="color:var(--muted);font-weight:700;">LATEST ${d}</span>`);
+        const keys = master.mode === "stacked"
+          ? ["IREDA", ...master.activeDrivers]
+          : ["IREDA", master.overlayKey];
+        const parts = keys.map((k) => {
+          const cfg = MASTER_TRACKS[k];
+          const v = data.series[k][i];
+          const breach = isRedBreach(cfg, v);
+          const col = breach ? "var(--red)" : (k === "IREDA" ? "var(--accent)" : "var(--fg)");
+          const flag = breach ? (cfg.redDir === "above" ? " ▲" : " ▼") : "";
+          return `<span><span class="muted">${cfg.short}</span> <strong style="color:${col}">${fmtMasterVal(k, v)}${flag}</strong></span>`;
+        });
+        el.innerHTML = tag + `<span class="muted">|</span>` + parts.join("");
+      }
+
+      function drawMaster() {
+        if (!STATE) return;
+        const data = buildMasterData();
+        master.cache = data;
+        if (!data || !data.dates.length) return;
+        const n = data.dates.length;
+        if (master.pinnedIdx !== null && master.pinnedIdx >= n) master.pinnedIdx = n - 1;
+        const activeIdx = master.pinnedIdx !== null ? master.pinnedIdx : (master.hoverIdx !== null ? master.hoverIdx : n - 1);
+
+        const box = document.getElementById("masterCanvasBox");
+        const w = box.clientWidth;
+        if (!w) return;
+        const narrow = w < 560;
+        const padL = narrow ? 46 : 56;
+        const padR = master.mode === "overlay" ? (narrow ? 56 : 70) : (narrow ? 76 : 106);
+        const plotW = Math.max(80, w - padL - padR);
+        const padT = 10, padB = 24;
+
+        let totalH;
+        const tracks = master.mode === "stacked" ? ["IREDA", ...master.activeDrivers] : ["IREDA", master.overlayKey];
+        const iredaH = 128;
+        const subH = 66;
+        const gap = 6;
+        if (master.mode === "stacked") {
+          totalH = padT + iredaH + master.activeDrivers.length * (subH + gap) + padB;
+        } else {
+          totalH = 350;
+        }
+        box.style.height = totalH + "px";
+
+        const dpr = window.devicePixelRatio || 1;
+        mCanvas.width = Math.round(w * dpr);
+        mCanvas.height = Math.round(totalH * dpr);
+        mCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const cs = getComputedStyle(document.body);
+        const bg = cs.getPropertyValue("--card").trim();
+        const bg2 = cs.getPropertyValue("--card-2").trim();
+        const border = cs.getPropertyValue("--border").trim();
+        const fg = cs.getPropertyValue("--fg").trim();
+        const muted = cs.getPropertyValue("--muted").trim();
+
+        mCtx.fillStyle = bg;
+        mCtx.fillRect(0, 0, w, totalH);
+
+        const xOf = (i) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+        master.layout = { padL, padR, plotW, padT, totalH, n };
+
+        // Compute month boundary ticks on shared X-axis
+        const monthTicks = [];
+        let lastYm = "";
+        for (let i = 0; i < n; i++) {
+          const ym = data.dates[i].slice(0, 7);
+          if (ym !== lastYm) {
+            monthTicks.push({ i, lbl: data.dates[i].slice(2, 7) });
+            lastYm = ym;
+          }
+        }
+
+        const plotBottom = totalH - padB;
+
+        if (master.mode === "stacked") {
+          let curY = padT;
+          const trackRects = [];
+          for (let ti = 0; ti < tracks.length; ti++) {
+            const key = tracks[ti];
+            const hT = ti === 0 ? iredaH : subH;
+            trackRects.push({ key, y0: curY, y1: curY + hT, h: hT });
+            curY += hT + gap;
+          }
+
+          // Track backgrounds & vertical month lines
+          for (let ti = 0; ti < trackRects.length; ti++) {
+            const tr = trackRects[ti];
+            mCtx.fillStyle = ti % 2 === 0 ? bg : bg2;
+            mCtx.fillRect(padL, tr.y0, plotW, tr.h);
+            mCtx.strokeStyle = border;
+            mCtx.lineWidth = 1;
+            mCtx.strokeRect(padL, tr.y0, plotW, tr.h);
+            for (const mt of monthTicks) {
+              const mx = xOf(mt.i);
+              mCtx.beginPath(); mCtx.moveTo(mx, tr.y0); mCtx.lineTo(mx, tr.y1); mCtx.stroke();
+            }
+          }
+
+          // Turning point vertical guides (IREDA visible Peak & Low)
+          if (master.showGuides) {
+            for (const [gi, col] of [[data.maxIdx, "rgba(34,197,94,0.45)"], [data.minIdx, "rgba(244,63,94,0.5)"]]) {
+              const gx = xOf(gi);
+              mCtx.save();
+              mCtx.strokeStyle = col;
+              mCtx.lineWidth = 1.2;
+              mCtx.setLineDash([3, 3]);
+              mCtx.beginPath(); mCtx.moveTo(gx, padT); mCtx.lineTo(gx, plotBottom); mCtx.stroke();
+              mCtx.restore();
+            }
+          }
+
+          // Draw each track's series, red-breach fill, fixed ceilings, and labels
+          for (let ti = 0; ti < trackRects.length; ti++) {
+            const tr = trackRects[ti];
+            const key = tr.key;
+            const cfg = MASTER_TRACKS[key];
+            const vals = data.series[key];
+            let ymin = Infinity, ymax = -Infinity;
+            for (const v of vals) {
+              if (v === null) continue;
+              if (v < ymin) ymin = v;
+              if (v > ymax) ymax = v;
+            }
+            if (cfg.redLine !== null && cfg.redLine !== undefined) {
+              if (cfg.redLine < ymin) ymin = cfg.redLine;
+              if (cfg.redLine > ymax) ymax = cfg.redLine;
+            }
+            if (key === "BRENT" && cfg.refLine !== null) {
+              if (cfg.refLine > ymax) ymax = cfg.refLine;
+            }
+            const ypad = Math.max((ymax - ymin) * 0.12, 1e-6);
+            ymin -= ypad; ymax += ypad;
+            const yOf = (v) => tr.y1 - ((v - ymin) / (ymax - ymin)) * tr.h;
+
+            // Left Y-axis top/bottom ticks
+            mCtx.font = "10px ui-monospace, monospace";
+            mCtx.fillStyle = muted;
+            mCtx.textAlign = "right";
+            mCtx.textBaseline = "top";
+            mCtx.fillText(ymax.toFixed(cfg.dec), padL - 5, tr.y0 + 3);
+            mCtx.textBaseline = "bottom";
+            mCtx.fillText(ymin.toFixed(cfg.dec), padL - 5, tr.y1 - 2);
+
+            mCtx.save();
+            mCtx.beginPath(); mCtx.rect(padL, tr.y0, plotW, tr.h); mCtx.clip();
+
+            // Translucent red shading wherever price breaches its Red Line
+            if (cfg.redLine !== null && cfg.redLine !== undefined) {
+              const ry = yOf(cfg.redLine);
+              mCtx.save();
+              mCtx.beginPath();
+              if (cfg.redDir === "above") {
+                mCtx.rect(padL, tr.y0, plotW, Math.max(0, ry - tr.y0));
+              } else {
+                mCtx.rect(padL, ry, plotW, Math.max(0, tr.y1 - ry));
+              }
+              mCtx.clip();
+              mCtx.beginPath();
+              let started = false, firstX = padL, lastX = padL;
+              for (let i = 0; i < n; i++) {
+                if (vals[i] === null) continue;
+                const px = xOf(i), py = yOf(vals[i]);
+                if (!started) { mCtx.moveTo(px, py); firstX = px; started = true; }
+                else mCtx.lineTo(px, py);
+                lastX = px;
+              }
+              if (started) {
+                mCtx.lineTo(lastX, ry);
+                mCtx.lineTo(firstX, ry);
+                mCtx.closePath();
+                mCtx.fillStyle = "rgba(239,68,68,0.22)";
+                mCtx.fill();
+              }
+              mCtx.restore();
+
+              // Fixed Red Line
+              mCtx.strokeStyle = "#ef4444";
+              mCtx.lineWidth = 1.2;
+              mCtx.setLineDash([4, 3]);
+              mCtx.beginPath(); mCtx.moveTo(padL, ry); mCtx.lineTo(padL + plotW, ry); mCtx.stroke();
+              mCtx.setLineDash([]);
+            }
+
+            // Secondary fixed reference line (e.g. Brent $100 Cap, IN10Y ₹30 Lid, IREDA ₹142.85 Peak)
+            if (cfg.refLine !== null && cfg.refLine >= ymin && cfg.refLine <= ymax) {
+              const rfy = yOf(cfg.refLine);
+              mCtx.strokeStyle = cfg.refColor || "#94a3b8";
+              mCtx.lineWidth = 1;
+              mCtx.setLineDash([2, 3]);
+              mCtx.beginPath(); mCtx.moveTo(padL, rfy); mCtx.lineTo(padL + plotW, rfy); mCtx.stroke();
+              mCtx.setLineDash([]);
+              mCtx.font = "600 9.5px ui-monospace, monospace";
+              mCtx.fillStyle = cfg.refColor || muted;
+              mCtx.textAlign = "right";
+              mCtx.textBaseline = "bottom";
+              mCtx.fillText(cfg.refLbl, padL + plotW - 4, rfy - 2);
+            }
+
+            // IREDA 200 EMA overlay on top track
+            if (cfg.showEma200 && data.series.IREDA_E200) {
+              mCtx.strokeStyle = "#a855f7";
+              mCtx.lineWidth = 1.2;
+              mCtx.setLineDash([4, 3]);
+              mCtx.beginPath();
+              let s = false;
+              for (let i = 0; i < n; i++) {
+                const ev = data.series.IREDA_E200[i];
+                if (ev === null) continue;
+                const px = xOf(i), py = yOf(ev);
+                if (!s) { mCtx.moveTo(px, py); s = true; } else mCtx.lineTo(px, py);
+              }
+              mCtx.stroke();
+              mCtx.setLineDash([]);
+            }
+
+            // Main price line
+            mCtx.strokeStyle = cfg.color;
+            mCtx.lineWidth = ti === 0 ? 2.0 : 1.6;
+            mCtx.beginPath();
+            let s = false;
+            for (let i = 0; i < n; i++) {
+              if (vals[i] === null) continue;
+              const px = xOf(i), py = yOf(vals[i]);
+              if (!s) { mCtx.moveTo(px, py); s = true; } else mCtx.lineTo(px, py);
+            }
+            mCtx.stroke();
+
+            // IREDA Peak/Low text labels on top track
+            if (ti === 0 && master.showGuides) {
+              mCtx.font = "700 10px ui-monospace, monospace";
+              for (const [gi, tag, col] of [
+                [data.maxIdx, `Peak ${fmtMasterVal("IREDA", vals[data.maxIdx])}`, "#22c55e"],
+                [data.minIdx, `Low ${fmtMasterVal("IREDA", vals[data.minIdx])}`, "#f43f5e"],
+              ]) {
+                const gx = xOf(gi), gy = yOf(vals[gi]);
+                mCtx.beginPath(); mCtx.arc(gx, gy, 3.2, 0, Math.PI * 2); mCtx.fillStyle = col; mCtx.fill();
+                mCtx.fillStyle = col;
+                mCtx.textAlign = gx > padL + plotW * 0.72 ? "right" : "left";
+                mCtx.textBaseline = gi === data.maxIdx ? "top" : "bottom";
+                mCtx.fillText(tag, gx + (gx > padL + plotW * 0.72 ? -5 : 5), gi === data.maxIdx ? tr.y0 + 16 : tr.y1 - 4);
+              }
+            }
+
+            // Track label top-left inside plot
+            mCtx.font = "700 10.5px -apple-system, sans-serif";
+            mCtx.fillStyle = cfg.color;
+            mCtx.textAlign = "left";
+            mCtx.textBaseline = "top";
+            mCtx.fillText(cfg.label + (ti === 0 ? "  (Purple = 200 EMA)" : ""), padL + 6, tr.y0 + 4);
+
+            // Active crosshair marker dot
+            if (vals[activeIdx] !== null) {
+              mCtx.beginPath();
+              mCtx.arc(xOf(activeIdx), yOf(vals[activeIdx]), 3.8, 0, Math.PI * 2);
+              mCtx.fillStyle = isRedBreach(cfg, vals[activeIdx]) ? "#ef4444" : cfg.color;
+              mCtx.fill();
+              mCtx.strokeStyle = bg;
+              mCtx.lineWidth = 1.3;
+              mCtx.stroke();
+            }
+            mCtx.restore();
+
+            // Right margin readout: current/hovered value + Red ceiling reminder
+            const av = vals[activeIdx];
+            const breach = isRedBreach(cfg, av);
+            mCtx.font = "700 11px ui-monospace, monospace";
+            mCtx.fillStyle = breach ? "#ef4444" : fg;
+            mCtx.textAlign = "left";
+            mCtx.textBaseline = "middle";
+            mCtx.fillText(fmtMasterVal(key, av), padL + plotW + 6, tr.y0 + tr.h * 0.38);
+            if (cfg.redLbl) {
+              mCtx.font = "600 9.5px ui-monospace, monospace";
+              mCtx.fillStyle = breach ? "#ef4444" : muted;
+              mCtx.fillText(cfg.redLbl, padL + plotW + 6, tr.y0 + tr.h * 0.72);
+            }
+          }
+        } else {
+          // ===== PAIR OVERLAY MODE (Dual true-price axes: IREDA Left, Driver Right) =====
+          const dKey = master.overlayKey;
+          const irCfg = MASTER_TRACKS.IREDA;
+          const dCfg = MASTER_TRACKS[dKey];
+          const irVals = data.series.IREDA;
+          const dVals = data.series[dKey];
+          const y0 = padT, y1 = plotBottom, hP = y1 - y0;
+
+          mCtx.fillStyle = bg2;
+          mCtx.fillRect(padL, y0, plotW, hP);
+          mCtx.strokeStyle = border;
+          mCtx.lineWidth = 1;
+          mCtx.strokeRect(padL, y0, plotW, hP);
+
+          for (const mt of monthTicks) {
+            const mx = xOf(mt.i);
+            mCtx.beginPath(); mCtx.moveTo(mx, y0); mCtx.lineTo(mx, y1); mCtx.stroke();
+          }
+
+          let irMin = Infinity, irMax = -Infinity;
+          for (const v of irVals) { if (v < irMin) irMin = v; if (v > irMax) irMax = v; }
+          irMin = Math.min(irMin, irCfg.redLine);
+          const irPad = Math.max((irMax - irMin) * 0.1, 1e-6);
+          irMin -= irPad; irMax += irPad;
+          const yIr = (v) => y1 - ((v - irMin) / (irMax - irMin)) * hP;
+
+          let dMin = Infinity, dMax = -Infinity;
+          for (const v of dVals) { if (v !== null) { if (v < dMin) dMin = v; if (v > dMax) dMax = v; } }
+          if (dCfg.redLine !== null) { dMin = Math.min(dMin, dCfg.redLine); dMax = Math.max(dMax, dCfg.redLine); }
+          if (dKey === "BRENT" && dCfg.refLine !== null) dMax = Math.max(dMax, dCfg.refLine);
+          const dPad = Math.max((dMax - dMin) * 0.1, 1e-6);
+          dMin -= dPad; dMax += dPad;
+          const yDr = (v) => master.invertOverlay
+            ? y0 + ((v - dMin) / (dMax - dMin)) * hP
+            : y1 - ((v - dMin) / (dMax - dMin)) * hP;
+
+          // Horizontal grid + Left (IREDA) and Right (Driver) real price ticks
+          mCtx.font = "10px ui-monospace, monospace";
+          for (let k = 0; k <= 4; k++) {
+            const frac = k / 4;
+            const py = y1 - frac * hP;
+            mCtx.strokeStyle = border; mCtx.lineWidth = 1;
+            mCtx.beginPath(); mCtx.moveTo(padL, py); mCtx.lineTo(padL + plotW, py); mCtx.stroke();
+            const lv = irMin + frac * (irMax - irMin);
+            mCtx.fillStyle = irCfg.color; mCtx.textAlign = "right"; mCtx.textBaseline = "middle";
+            mCtx.fillText(lv.toFixed(1), padL - 5, py);
+            const rv = master.invertOverlay ? dMax - frac * (dMax - dMin) : dMin + frac * (dMax - dMin);
+            mCtx.fillStyle = dCfg.color; mCtx.textAlign = "left";
+            mCtx.fillText(rv.toFixed(dCfg.dec), padL + plotW + 6, py);
+          }
+
+          if (master.showGuides) {
+            for (const [gi, col] of [[data.maxIdx, "rgba(34,197,94,0.45)"], [data.minIdx, "rgba(244,63,94,0.5)"]]) {
+              const gx = xOf(gi);
+              mCtx.save(); mCtx.strokeStyle = col; mCtx.lineWidth = 1.2; mCtx.setLineDash([3, 3]);
+              mCtx.beginPath(); mCtx.moveTo(gx, y0); mCtx.lineTo(gx, y1); mCtx.stroke();
+              mCtx.restore();
+            }
+          }
+
+          mCtx.save();
+          mCtx.beginPath(); mCtx.rect(padL, y0, plotW, hP); mCtx.clip();
+
+          // IREDA ₹119.50 stop line
+          mCtx.strokeStyle = "rgba(56,189,248,0.45)"; mCtx.lineWidth = 1.1; mCtx.setLineDash([4, 4]);
+          mCtx.beginPath(); mCtx.moveTo(padL, yIr(irCfg.redLine)); mCtx.lineTo(padL + plotW, yIr(irCfg.redLine)); mCtx.stroke();
+
+          // Driver red ceiling/floor line + Brent $100 cap
+          if (dCfg.redLine !== null) {
+            const ry = yDr(dCfg.redLine);
+            mCtx.strokeStyle = "#ef4444"; mCtx.lineWidth = 1.3; mCtx.setLineDash([5, 3]);
+            mCtx.beginPath(); mCtx.moveTo(padL, ry); mCtx.lineTo(padL + plotW, ry); mCtx.stroke();
+            mCtx.setLineDash([]);
+            mCtx.font = "700 10px ui-monospace, monospace"; mCtx.fillStyle = "#ef4444";
+            mCtx.textAlign = "right"; mCtx.textBaseline = "bottom";
+            mCtx.fillText(`${dCfg.short} ${dCfg.redLbl}`, padL + plotW - 5, ry - 3);
+          }
+          if (dKey === "BRENT" && dCfg.refLine !== null) {
+            const c100 = yDr(dCfg.refLine);
+            mCtx.strokeStyle = "#f43f5e"; mCtx.lineWidth = 1.1; mCtx.setLineDash([2, 3]);
+            mCtx.beginPath(); mCtx.moveTo(padL, c100); mCtx.lineTo(padL + plotW, c100); mCtx.stroke();
+            mCtx.setLineDash([]);
+            mCtx.font = "700 10px ui-monospace, monospace"; mCtx.fillStyle = "#f43f5e";
+            mCtx.textAlign = "right"; mCtx.textBaseline = "bottom";
+            mCtx.fillText("Brent $100 Cap", padL + plotW - 5, c100 - 3);
+          }
+
+          // IREDA 200 EMA
+          mCtx.strokeStyle = "rgba(168,85,247,0.7)"; mCtx.lineWidth = 1.2; mCtx.setLineDash([4, 3]);
+          mCtx.beginPath();
+          let es = false;
+          for (let i = 0; i < n; i++) {
+            const ev = data.series.IREDA_E200[i];
+            if (ev === null) continue;
+            if (!es) { mCtx.moveTo(xOf(i), yIr(ev)); es = true; } else mCtx.lineTo(xOf(i), yIr(ev));
+          }
+          mCtx.stroke(); mCtx.setLineDash([]);
+
+          // Driver Line (Right Axis)
+          mCtx.strokeStyle = dCfg.color; mCtx.lineWidth = 1.9; mCtx.beginPath();
+          let ds = false;
+          for (let i = 0; i < n; i++) {
+            if (dVals[i] === null) continue;
+            if (!ds) { mCtx.moveTo(xOf(i), yDr(dVals[i])); ds = true; } else mCtx.lineTo(xOf(i), yDr(dVals[i]));
+          }
+          mCtx.stroke();
+
+          // IREDA Line (Left Axis)
+          mCtx.strokeStyle = irCfg.color; mCtx.lineWidth = 2.2; mCtx.beginPath();
+          for (let i = 0; i < n; i++) {
+            if (i === 0) mCtx.moveTo(xOf(i), yIr(irVals[i])); else mCtx.lineTo(xOf(i), yIr(irVals[i]));
+          }
+          mCtx.stroke();
+
+          // Dots at active index
+          mCtx.beginPath(); mCtx.arc(xOf(activeIdx), yIr(irVals[activeIdx]), 4.2, 0, Math.PI * 2);
+          mCtx.fillStyle = irCfg.color; mCtx.fill();
+          if (dVals[activeIdx] !== null) {
+            mCtx.beginPath(); mCtx.arc(xOf(activeIdx), yDr(dVals[activeIdx]), 4.2, 0, Math.PI * 2);
+            mCtx.fillStyle = isRedBreach(dCfg, dVals[activeIdx]) ? "#ef4444" : dCfg.color; mCtx.fill();
+          }
+
+          // Top legend inside plot
+          mCtx.font = "700 11px -apple-system, sans-serif"; mCtx.textAlign = "left"; mCtx.textBaseline = "top";
+          mCtx.fillStyle = irCfg.color;
+          mCtx.fillText("● IREDA.NS (Left ₹)", padL + 8, y0 + 6);
+          mCtx.fillStyle = dCfg.color;
+          mCtx.fillText(`● ${dCfg.label} (Right${master.invertOverlay ? " · INVERTED" : ""})`, padL + 150, y0 + 6);
+          mCtx.restore();
+        }
+
+        // Unified full-height vertical crosshair line
+        const cx = xOf(activeIdx);
+        const accentCol = cs.getPropertyValue("--accent").trim() || "#38bdf8";
+        mCtx.save();
+        mCtx.strokeStyle = master.pinnedIdx !== null ? accentCol : fg;
+        mCtx.globalAlpha = master.pinnedIdx !== null ? 0.95 : 0.45;
+        mCtx.lineWidth = master.pinnedIdx !== null ? 1.6 : 1.1;
+        if (master.pinnedIdx === null) mCtx.setLineDash([4, 3]);
+        mCtx.beginPath(); mCtx.moveTo(cx, padT); mCtx.lineTo(cx, plotBottom); mCtx.stroke();
+        mCtx.restore();
+
+        // Shared X-axis month labels along bottom
+        mCtx.font = "10px ui-monospace, monospace";
+        mCtx.fillStyle = muted;
+        mCtx.textAlign = "center";
+        mCtx.textBaseline = "top";
+        let lastLblX = -999;
+        for (const mt of monthTicks) {
+          const mx = xOf(mt.i);
+          if (mx - lastLblX < 44) continue;
+          mCtx.fillText(mt.lbl, mx, plotBottom + 6);
+          lastLblX = mx;
+        }
+
+        renderMasterReadout(data, activeIdx);
+      }
+
+      function masterIdxFromClientX(clientX) {
+        if (!master.layout || !master.cache) return null;
+        const rect = mCanvas.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const { padL, plotW, n } = master.layout;
+        if (n <= 1) return 0;
+        const frac = (x - padL) / plotW;
+        return Math.max(0, Math.min(n - 1, Math.round(frac * (n - 1))));
+      }
+
+      mCanvas.addEventListener("mousemove", (e) => {
+        if (master.pinnedIdx !== null) return;
+        const idx = masterIdxFromClientX(e.clientX);
+        if (idx !== null && idx !== master.hoverIdx) {
+          master.hoverIdx = idx;
+          drawMaster();
+        }
+      });
+      mCanvas.addEventListener("mouseleave", () => {
+        if (master.pinnedIdx !== null) return;
+        if (master.hoverIdx !== null) {
+          master.hoverIdx = null;
+          drawMaster();
+        }
+      });
+      mCanvas.addEventListener("click", (e) => {
+        const idx = masterIdxFromClientX(e.clientX);
+        if (idx === null) return;
+        master.pinnedIdx = master.pinnedIdx === idx ? null : idx;
+        renderMasterPills();
+        drawMaster();
+      });
+      mCanvas.addEventListener("touchstart", (e) => {
+        if (!e.touches.length) return;
+        const idx = masterIdxFromClientX(e.touches[0].clientX);
+        if (idx !== null) { master.hoverIdx = idx; drawMaster(); }
+      }, { passive: true });
+      mCanvas.addEventListener("touchmove", (e) => {
+        if (!e.touches.length) return;
+        const idx = masterIdxFromClientX(e.touches[0].clientX);
+        if (idx !== null && idx !== master.hoverIdx) { master.hoverIdx = idx; drawMaster(); }
+      }, { passive: true });
+
+      document.querySelectorAll(".master-mode").forEach((b) => b.addEventListener("click", () => {
+        master.mode = b.dataset.mode;
+        document.querySelectorAll(".master-mode").forEach((x) => x.classList.toggle("active", x.dataset.mode === master.mode));
+        renderMasterPills();
+        drawMaster();
+      }));
+      document.querySelectorAll(".master-range").forEach((b) => b.addEventListener("click", () => {
+        master.range = parseInt(b.dataset.range, 10);
+        master.pinnedIdx = null;
+        master.hoverIdx = null;
+        document.querySelectorAll(".master-range").forEach((x) => x.classList.toggle("active", parseInt(x.dataset.range, 10) === master.range));
+        renderMasterPills();
+        drawMaster();
+      }));
+      document.getElementById("btnMasterGuides").addEventListener("click", (e) => {
+        master.showGuides = !master.showGuides;
+        e.target.classList.toggle("active", master.showGuides);
+        drawMaster();
+      });
+      document.getElementById("btnMasterInvert").addEventListener("click", (e) => {
+        master.invertOverlay = !master.invertOverlay;
+        e.target.classList.toggle("active", master.invertOverlay);
+        drawMaster();
+      });
+      document.getElementById("btnMasterUnpin").addEventListener("click", () => {
+        master.pinnedIdx = null;
+        master.hoverIdx = null;
+        renderMasterPills();
+        drawMaster();
+      });
 
       // Wire controls
       document.getElementById("btnTheme").addEventListener("click", () => {
         document.body.classList.toggle("light");
         drawChart();
+        drawMaster();
       });
       document.getElementById("btnOpenIredaChart").addEventListener("click", () => openChart("IREDA"));
       document.getElementById("btnCloseDrawer").addEventListener("click", () => {
@@ -774,7 +1475,7 @@
         renderLocalPos();
       });
 
-      window.addEventListener("resize", drawChart);
+      window.addEventListener("resize", () => { drawChart(); drawMaster(); });
       loadLocalPos();
 
       fetch("./cockpit_state.json?t=" + Date.now())

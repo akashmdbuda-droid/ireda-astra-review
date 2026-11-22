@@ -35,7 +35,7 @@ Alongside the frozen Astra review bundle above, this repository also serves a li
 
 | File | Purpose |
 | :--- | :--- |
-| [`cockpit.html`](cockpit.html) | Simplified 1-screen dashboard: 3-second action signal (`HOLD & RIDE` / `ALERT` / `EXIT`), 5 macro traffic lights (`Brent`, `India 10Y Bond ETF`, `USD/INR`, `India VIX`, `Global Risk`), expandable Daily/Weekly trendline chart drawer, IREDA price ladder, and auto-graded prediction scorecard |
+| [`cockpit.html`](cockpit.html) | Simplified 1-screen dashboard: 3-second action signal (`HOLD & RIDE` / `ALERT` / `EXIT`), 5 macro traffic lights (`Brent`, `India 10Y Bond ETF`, `USD/INR`, `India VIX`, `Global Risk`), expandable Daily/Weekly trendline chart drawer, IREDA price ladder, 1Y **Master Synchronized Timeline** (Stacked Tracks + Pair Overlay with fixed red ceilings & click-to-pin crosshair), and auto-graded prediction scorecard |
 | [`scripts/daily_update.py`](scripts/daily_update.py) | Zero-dependency Python 3 updater that fetches Yahoo Finance Daily/Weekly OHLCV for 10 assets, computes EMAs/RSI/ATR & structural trendlines, evaluates the 5 lights, auto-grades pending predictions, and writes `cockpit_state.json` |
 | [`cockpit_state.json`](cockpit_state.json) | Auto-updated market snapshot & chart payload consumed by `cockpit.html` |
 | [`daily_ledger.jsonl`](daily_ledger.jsonl) | Falsifiable prediction-vs-reality ledger automatically graded (`HIT` / `MISS` / `EXPIRED`) on subsequent daily bars |

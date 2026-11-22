@@ -732,7 +732,7 @@ def main() -> int:
                 "stale": False,
             }
 
-            d_tail = d_clean[-190:]
+            d_tail = d_clean[-260:]
             w_tail = w_clean[-115:]
             charts[key] = {
                 "name": meta["name"], "unit": meta["unit"], "dec": dec,

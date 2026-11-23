@@ -35,10 +35,10 @@ Alongside the frozen Astra review bundle above, this repository also serves a li
 
 | File | Purpose |
 | :--- | :--- |
-| [`cockpit.html`](cockpit.html) | Simplified 1-screen dashboard: 3-second action signal (`HOLD & RIDE` / `ALERT` / `EXIT`), 5 macro traffic lights (`Brent`, `India 10Y Bond ETF`, `USD/INR`, `India VIX`, `Global Risk`), expandable Daily/Weekly trendline chart drawer, IREDA price ladder, 1Y **Master Synchronized Timeline** (Stacked Tracks + Pair Overlay with fixed red ceilings & click-to-pin crosshair), and auto-graded prediction scorecard |
-| [`scripts/daily_update.py`](scripts/daily_update.py) | Zero-dependency Python 3 updater that fetches Yahoo Finance Daily/Weekly OHLCV for 10 assets, computes EMAs/RSI/ATR & structural trendlines, evaluates the 5 lights, auto-grades pending predictions, and writes `cockpit_state.json` |
+| [`cockpit.html`](cockpit.html) | Simplified 1-screen dashboard powered by Highcharts Stock: 3-second action signal (`HOLD & RIDE` / `ALERT` / `EXIT`), 5 macro traffic lights, expandable Candlestick + Trendline + RSI drawer, IREDA price ladder, 1Y **Master Synchronized Timeline** (Stacked Panes + Pair Overlay), in-dashboard **`↻ Refresh Now`** button, and auto-graded prediction scorecard |
+| [`scripts/daily_update.py`](scripts/daily_update.py) | Zero-dependency Python 3 updater that fetches Yahoo Finance Daily/Weekly OHLCV for 10 assets, computes EMAs/RSI/ATR & structural trendlines, evaluates the 5 lights, auto-grades pending predictions (intraday-safe), and writes `cockpit_state.json` |
 | [`cockpit_state.json`](cockpit_state.json) | Auto-updated market snapshot & chart payload consumed by `cockpit.html` |
 | [`daily_ledger.jsonl`](daily_ledger.jsonl) | Falsifiable prediction-vs-reality ledger automatically graded (`HIT` / `MISS` / `EXPIRED`) on subsequent daily bars |
 | [`daily_history.jsonl`](daily_history.jsonl) | Append-only daily log of IREDA close, RSI, Macro Score, Red Lights, and Action Signal |
-| [`.github/workflows/daily_cockpit.yml`](.github/workflows/daily_cockpit.yml) | Scheduled GitHub Actions runner: **08:15 AM IST** (Mon–Fri pre-market), **04:15 PM IST** (Mon–Fri post-NSE close & grading), **06:00 PM IST** (Sunday weekly reset), plus manual `workflow_dispatch` |
+| [`.github/workflows/daily_cockpit.yml`](.github/workflows/daily_cockpit.yml) | Scheduled GitHub Actions runner on off-peak minutes: **08:23, 09:37, 12:07, 14:37, 16:07 IST** (Mon–Fri) + **18:13 IST** (Sunday), plus on-demand `workflow_dispatch` |
 

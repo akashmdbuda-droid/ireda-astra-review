@@ -172,6 +172,20 @@
       display: none; padding: 8px 12px; border-radius: 8px; font-size: 12px;
       background: rgba(245,158,11,0.12); border: 1px solid var(--amber); color: var(--amber);
     }
+    .refresh-panel {
+      display: none; padding: 10px 12px; border-radius: 10px; font-size: 12px;
+      background: var(--card); border: 1px solid var(--border);
+      flex-direction: column; gap: 8px;
+    }
+    .refresh-panel.open { display: flex; }
+    .refresh-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+    .token-input {
+      width: 260px; max-width: 100%; padding: 5px 8px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--card-2); color: var(--fg); font-size: 12px;
+    }
+    .btn.primary { border-color: var(--accent); color: var(--accent); }
+    .btn.primary:hover { background: var(--accent); color: #020617; }
+    .btn:disabled { opacity: 0.6; cursor: wait; }
   </style>
 </head>
 <body>
@@ -183,9 +197,31 @@
         <div class="mono muted" style="font-size:11px;" id="metaLine">Loading cockpit_state.json…</div>
       </div>
       <div class="nav-links">
+        <button class="btn primary" id="btnRefreshNow" title="Trigger live Yahoo Finance update via GitHub Actions (~35–45s) or reload latest JSON">↻ Refresh Now</button>
+        <button class="btn" id="btnTokenCfg" title="Configure browser-local repo-only GitHub token for 1-click cloud refresh">⚙</button>
         <a class="btn" href="./index.html">Full Astra Dashboard</a>
         <a class="btn" href="./review.html">Astra Bundle</a>
         <button class="btn" id="btnTheme">Light / Dark</button>
+      </div>
+    </div>
+
+    <!-- Collapsible Cloud Refresh & Browser-Local Token Panel -->
+    <div id="refreshPanel" class="refresh-panel">
+      <div class="refresh-row">
+        <div id="refreshStatus" class="mono" style="font-weight:700;">Ready for on-demand refresh.</div>
+        <div class="pill-row">
+          <a class="btn" target="_blank" rel="noopener" href="https://github.com/akashmdbuda-droid/ireda-astra-review/actions/workflows/daily_cockpit.yml">Open GitHub Actions ↗</a>
+          <button class="btn" id="btnCloseRefresh">✕</button>
+        </div>
+      </div>
+      <div id="tokenSetupRow" class="refresh-row" style="padding-top:8px;border-top:1px solid var(--border);">
+        <div class="pill-row">
+          <span class="muted">1-Click Cloud Refresh Token (saved <strong>only in this browser</strong>):</span>
+          <input id="ghTokenInput" type="password" class="token-input mono" placeholder="github_pat_… (Actions: Read & write only)" autocomplete="off" />
+          <button class="btn primary" id="btnSaveToken">Save Locally</button>
+          <button class="btn" id="btnClearToken">Clear</button>
+        </div>
+        <a class="muted" style="font-size:11px;" target="_blank" rel="noopener" href="https://github.com/settings/personal-access-tokens/new">Create repo-only Fine-Grained PAT ↗</a>
       </div>
     </div>
 
@@ -369,9 +405,12 @@
           <span class="sec-title">Automated Run Schedule (IST)</span>
         </div>
         <div class="cat-item mono" style="line-height:1.7;">
-          <div><strong>08:15 AM (Mon–Fri)</strong> · Overnight US / Oil / FX</div>
-          <div><strong>04:15 PM (Mon–Fri)</strong> · NSE Close + Auto-Grade</div>
-          <div><strong>06:00 PM (Sun)</strong> · Weekly Trendline Reset</div>
+          <div><strong>08:23 AM (Mon–Fri)</strong> · Overnight US / Oil / FX</div>
+          <div><strong>09:37 AM (Mon–Fri)</strong> · Post-NSE Open Live</div>
+          <div><strong>12:07 PM (Mon–Fri)</strong> · Mid-Session Check</div>
+          <div><strong>02:37 PM (Mon–Fri)</strong> · Pre-Close Decision Window</div>
+          <div><strong>04:07 PM (Mon–Fri)</strong> · Official Close + Auto-Grade</div>
+          <div><strong>06:13 PM (Sun)</strong> · Weekly Trendline Reset</div>
         </div>
         <div class="muted" style="font-size:11.5px;margin-top:8px;">
           Market-only read-only tracker powered by Yahoo Finance + Highcharts Stock (personal/non-commercial use) via GitHub Actions. Not personalized SEBI-registered investment advice.
@@ -1265,13 +1304,16 @@
       }
 
       function renderAll() {
+        const sess = STATE.market_session ? ` · ${STATE.market_session}` : "";
         document.getElementById("metaLine").textContent =
-          `Updated ${STATE.updated_at_ist} · IREDA Latest Bar: ${STATE.ireda.last_date} · Market-Only (Zero Personal Data in Repo)`;
+          `Updated ${STATE.updated_at_ist}${sess} · IREDA Bar: ${STATE.ireda.last_date} · Market-Only (Zero Personal Data in Repo)`;
 
         if (STATE.fetch_errors && STATE.fetch_errors.length) {
           const w = document.getElementById("staleWarn");
           w.style.display = "block";
           w.textContent = "Partial feed warning (cached fallback used): " + STATE.fetch_errors.join(" | ");
+        } else {
+          document.getElementById("staleWarn").style.display = "none";
         }
 
         const pill = document.getElementById("signalPill");
@@ -1295,7 +1337,7 @@
         const ir = STATE.ireda;
         document.getElementById("ladderNow").textContent = `₹${ir.last.toFixed(2)}`;
         document.getElementById("iredaChips").textContent =
-          `Close ₹${ir.last.toFixed(2)} (${fmtSign(ir.chg_pct)}) · 200 EMA ₹${ir.e200} · D-RSI ${ir.rsi} · W-RSI ${ir.w_rsi} · ATR ₹${ir.atr14}`;
+          `Last ₹${ir.last.toFixed(2)} (${fmtSign(ir.chg_pct)}) · 200 EMA ₹${ir.e200} · D-RSI ${ir.rsi} · W-RSI ${ir.w_rsi} · ATR ₹${ir.atr14}`;
 
         document.getElementById("predSummary").textContent =
           `${ps.hits} Hit · ${ps.misses} Miss · ${ps.pending} Pending` + (ps.hit_rate_pct !== null ? ` (${ps.hit_rate_pct}%)` : "");
@@ -1344,9 +1386,190 @@
         renderLocalPos();
         renderMasterPills();
         renderMasterChart();
+        if (ui.selectedAsset) renderDrawerChart();
+      }
+
+      // ===== ON-DEMAND CLOUD REFRESH (GITHUB ACTIONS DISPATCH + LIVE POLL) =====
+      const GH_REPO = "akashmdbuda-droid/ireda-astra-review";
+      const GH_WORKFLOW = "daily_cockpit.yml";
+      const GH_TOKEN_KEY = "ireda_cockpit_gh_pat_v1";
+      let refreshBusy = false;
+
+      function getSavedToken() {
+        try { return (localStorage.getItem(GH_TOKEN_KEY) || "").trim(); } catch (e) { return ""; }
+      }
+
+      function setRefreshStatus(msg, color) {
+        const panel = document.getElementById("refreshPanel");
+        const st = document.getElementById("refreshStatus");
+        panel.classList.add("open");
+        st.textContent = msg;
+        st.style.color = color || "var(--fg)";
+      }
+
+      function syncTokenUi() {
+        const hasTok = !!getSavedToken();
+        document.getElementById("ghTokenInput").value = hasTok ? "••••••••••••••••" : "";
+        document.getElementById("btnTokenCfg").classList.toggle("active", hasTok);
+      }
+
+      async function fetchFreshState() {
+        const r = await fetch("./cockpit_state.json?t=" + Date.now(), { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return await r.json();
+      }
+
+      async function triggerCloudRefresh() {
+        if (refreshBusy) return;
+        const btn = document.getElementById("btnRefreshNow");
+        const tok = getSavedToken();
+        const prevUtc = STATE ? STATE.updated_at_utc : null;
+
+        // Without a saved repo-only token, hard-reload latest JSON and open setup/fallback strip
+        if (!tok) {
+          btn.disabled = true;
+          btn.textContent = "⏳ Reloading…";
+          try {
+            const fresh = await fetchFreshState();
+            const changed = fresh.updated_at_utc !== prevUtc;
+            STATE = fresh;
+            renderAll();
+            document.getElementById("tokenSetupRow").style.display = "flex";
+            setRefreshStatus(
+              changed
+                ? `✓ Loaded newer snapshot (${fresh.updated_at_ist}). Paste a repo-only PAT below for 1-click live cloud fetches.`
+                : `Latest snapshot is ${fresh.updated_at_ist}. For 1-click live Yahoo fetches from here, save a repo-only PAT below (or click "Open GitHub Actions ↗" → Run workflow).`,
+              changed ? "var(--green)" : "var(--amber)"
+            );
+          } catch (err) {
+            setRefreshStatus("Reload failed: " + err.message, "var(--red)");
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "↻ Refresh Now";
+          }
+          return;
+        }
+
+        refreshBusy = true;
+        btn.disabled = true;
+        btn.textContent = "⏳ Updating…";
+        document.getElementById("tokenSetupRow").style.display = "none";
+        setRefreshStatus("1/3 Triggering GitHub Actions cloud fetch…", "var(--accent)");
+
+        try {
+          const disp = await fetch(
+            `https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`,
+            {
+              method: "POST",
+              headers: {
+                "Accept": "application/vnd.github+json",
+                "Authorization": `Bearer ${tok}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ ref: "main" }),
+            }
+          );
+          if (!disp.ok) {
+            const errTxt = disp.status === 401 || disp.status === 403
+              ? "Token rejected (HTTP " + disp.status + ") — ensure Fine-Grained PAT has Actions: Read & write on ireda-astra-review."
+              : "GitHub dispatch failed (HTTP " + disp.status + ").";
+            document.getElementById("tokenSetupRow").style.display = "flex";
+            setRefreshStatus(errTxt, "var(--red)");
+            return;
+          }
+
+          setRefreshStatus("2/3 Fetching live Yahoo Finance quotes & recalculating lights (~15s)…", "var(--accent)");
+          const startedAt = Date.now();
+          let runDone = false;
+          while (Date.now() - startedAt < 130000) {
+            await new Promise((res) => setTimeout(res, 4000));
+            const elapsed = Math.round((Date.now() - startedAt) / 1000);
+
+            if (!runDone) {
+              try {
+                const rr = await fetch(
+                  `https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/runs?per_page=1&t=${Date.now()}`,
+                  { headers: { "Accept": "application/vnd.github+json", "Authorization": `Bearer ${tok}` } }
+                );
+                if (rr.ok) {
+                  const rj = await rr.json();
+                  const latest = rj.workflow_runs && rj.workflow_runs[0];
+                  if (latest && new Date(latest.created_at).getTime() >= startedAt - 15000) {
+                    if (latest.status === "completed") {
+                      if (latest.conclusion !== "success") {
+                        setRefreshStatus(`Cloud run finished with status: ${latest.conclusion}. Check GitHub Actions log.`, "var(--red)");
+                        return;
+                      }
+                      runDone = true;
+                      setRefreshStatus(`3/3 Live data committed — waiting for GitHub Pages deploy (${elapsed}s)…`, "var(--accent)");
+                    } else {
+                      setRefreshStatus(`2/3 Cloud runner ${latest.status} (${elapsed}s)…`, "var(--accent)");
+                    }
+                  }
+                }
+              } catch (e) {}
+            } else {
+              setRefreshStatus(`3/3 Waiting for GitHub Pages CDN to serve new JSON (${elapsed}s)…`, "var(--accent)");
+            }
+
+            try {
+              const fresh = await fetchFreshState();
+              if (fresh && fresh.updated_at_utc && fresh.updated_at_utc !== prevUtc) {
+                STATE = fresh;
+                renderAll();
+                setRefreshStatus(
+                  `✓ Live refresh complete in ${elapsed}s! (${fresh.updated_at_ist} · IREDA ₹${fresh.ireda.last.toFixed(2)})`,
+                  "var(--green)"
+                );
+                return;
+              }
+            } catch (e) {}
+          }
+          setRefreshStatus("Cloud run was triggered, but Pages CDN took >2m — click ↻ Refresh Now again in a few seconds.", "var(--amber)");
+        } catch (err) {
+          setRefreshStatus("Refresh error: " + err.message, "var(--red)");
+        } finally {
+          refreshBusy = false;
+          btn.disabled = false;
+          btn.textContent = "↻ Refresh Now";
+        }
       }
 
       // Wire controls
+      document.getElementById("btnRefreshNow").addEventListener("click", triggerCloudRefresh);
+      document.getElementById("btnTokenCfg").addEventListener("click", () => {
+        const panel = document.getElementById("refreshPanel");
+        const row = document.getElementById("tokenSetupRow");
+        const opening = !panel.classList.contains("open") || row.style.display === "none";
+        panel.classList.toggle("open", opening);
+        row.style.display = "flex";
+        if (opening) {
+          syncTokenUi();
+          document.getElementById("refreshStatus").textContent = getSavedToken()
+            ? "Browser-local repo-only token is active. Clicking ↻ Refresh Now triggers a live cloud update."
+            : "Optional: Save a Fine-Grained PAT scoped ONLY to ireda-astra-review (Actions: Read & write) for 1-click refresh.";
+          document.getElementById("refreshStatus").style.color = "var(--muted)";
+        }
+      });
+      document.getElementById("btnCloseRefresh").addEventListener("click", () => {
+        document.getElementById("refreshPanel").classList.remove("open");
+      });
+      document.getElementById("btnSaveToken").addEventListener("click", () => {
+        const raw = document.getElementById("ghTokenInput").value.trim();
+        if (!raw || raw.startsWith("••")) {
+          setRefreshStatus("Paste a fresh Fine-Grained GitHub PAT first.", "var(--amber)");
+          return;
+        }
+        try { localStorage.setItem(GH_TOKEN_KEY, raw); } catch (e) {}
+        syncTokenUi();
+        setRefreshStatus("✓ Token saved strictly in this browser. Click ↻ Refresh Now to fetch live quotes!", "var(--green)");
+      });
+      document.getElementById("btnClearToken").addEventListener("click", () => {
+        try { localStorage.removeItem(GH_TOKEN_KEY); } catch (e) {}
+        syncTokenUi();
+        setRefreshStatus("Token removed from this browser.", "var(--muted)");
+      });
+
       document.getElementById("btnTheme").addEventListener("click", () => {
         document.body.classList.toggle("light");
         renderMasterChart();
@@ -1406,9 +1629,9 @@
       });
 
       loadLocalPos();
+      syncTokenUi();
 
-      fetch("./cockpit_state.json?t=" + Date.now())
-        .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      fetchFreshState()
         .then((data) => { STATE = data; renderAll(); })
         .catch((err) => {
           document.getElementById("metaLine").textContent = "Failed to load cockpit_state.json: " + err.message;

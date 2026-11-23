@@ -512,7 +512,33 @@ def save_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def update_and_grade_ledger(daily_bars: dict[str, list[dict[str, Any]]], signal: dict[str, str], ireda_snap: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+NSE_ASSETS = {"IREDA", "IN10Y_ETF", "NIFTY", "INDIAVIX"}
+
+
+def is_bar_closed(asset: str, bar_date: str, now_ist: dt.datetime) -> bool:
+    """Return True if the daily bar for `asset` on `bar_date` is an official completed close."""
+    if asset in NSE_ASSETS:
+        today_ist = now_ist.date().isoformat()
+        if bar_date < today_ist:
+            return True
+        if bar_date == today_ist and (now_ist.hour, now_ist.minute) >= (15, 40):
+            return True
+        return False
+    now_utc = now_ist.astimezone(dt.timezone.utc)
+    today_utc = now_utc.date().isoformat()
+    if bar_date < today_utc:
+        return True
+    if bar_date == today_utc and now_utc.hour >= 22:
+        return True
+    return False
+
+
+def update_and_grade_ledger(
+    daily_bars: dict[str, list[dict[str, Any]]],
+    signal: dict[str, str],
+    ireda_snap: dict[str, Any],
+    now_ist: dt.datetime,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     rows = load_jsonl(LEDGER_FILE)
     if not rows:
         rows = [dict(r) for r in DEFAULT_SEED_PREDICTIONS]
@@ -528,10 +554,19 @@ def update_and_grade_ledger(daily_bars: dict[str, list[dict[str, Any]]], signal:
         post_bars = [b for b in bars if b["d"] > logged and b["d"] <= due]
         resolved = False
         for b in post_bars:
+            closed = is_bar_closed(pred["asset"], b["d"], now_ist)
             hit_val = b[pred["hit_field"]]
             miss_val = b[pred["miss_field"]]
-            hit_ok = _cmp(hit_val, pred["hit_op"], float(pred["hit_val"]))
-            miss_ok = _cmp(miss_val, pred["miss_op"], float(pred["miss_val"]))
+            hit_ok = (
+                False
+                if (pred["hit_field"] == "c" and not closed)
+                else _cmp(hit_val, pred["hit_op"], float(pred["hit_val"]))
+            )
+            miss_ok = (
+                False
+                if (pred["miss_field"] == "c" and not closed)
+                else _cmp(miss_val, pred["miss_op"], float(pred["miss_val"]))
+            )
             if miss_ok and not hit_ok:
                 pred["status"] = "MISS"
                 pred["resolved_date"] = b["d"]
@@ -546,11 +581,12 @@ def update_and_grade_ledger(daily_bars: dict[str, list[dict[str, Any]]], signal:
                 pred["outcome_note"] = f"Target reached on {b['d']} at {hit_val}"
                 resolved = True
                 break
-        if not resolved and bars[-1]["d"] > due:
+        closed_bars = [b for b in bars if is_bar_closed(pred["asset"], b["d"], now_ist)]
+        if not resolved and closed_bars and closed_bars[-1]["d"] > due:
             pred["status"] = "EXPIRED"
-            pred["resolved_date"] = bars[-1]["d"]
-            pred["resolved_price"] = bars[-1]["c"]
-            pred["outcome_note"] = f"Window ended ({due}); close {bars[-1]['c']}"
+            pred["resolved_date"] = closed_bars[-1]["d"]
+            pred["resolved_price"] = closed_bars[-1]["c"]
+            pred["outcome_note"] = f"Window ended ({due}); close {closed_bars[-1]['c']}"
 
     # Auto-roll a fresh 14-calendar-day (~10 session) IREDA regime call whenever no IREDA swing/regime call is pending
     has_ireda_regime_pending = any(
@@ -764,17 +800,23 @@ def main() -> int:
 
     lights, macro_score, red_lights = eval_five_lights(snap)
     signal = compute_action_signal(snap["IREDA"], macro_score, red_lights)
-    ledger_rows, pred_stats = update_and_grade_ledger(daily_bars, signal, snap["IREDA"])
+    ledger_rows, pred_stats = update_and_grade_ledger(daily_bars, signal, snap["IREDA"], now_ist)
     history_rows = update_history(now_ist, snap["IREDA"], macro_score, red_lights, signal, pred_stats, lights)
 
     # Upcoming catalysts (only show dates >= today - 1 day)
     today_iso = now_ist.date().isoformat()
     upcoming = [c for c in CATALYSTS if c["date"] >= today_iso][:4]
+    is_nse_live = (
+        now_ist.weekday() < 5
+        and (9, 15) <= (now_ist.hour, now_ist.minute) <= (15, 35)
+        and snap["IREDA"]["last_date"] == today_iso
+    )
 
     state = {
         "schema_version": "cockpit-v1",
         "updated_at_ist": now_ist.strftime("%Y-%m-%d %H:%M IST"),
         "updated_at_utc": now_ist.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "market_session": "LIVE INTRADAY (NSE)" if is_nse_live else "EOD / PRE-MARKET",
         "sanitized_market_only": True,
         "fetch_errors": fetch_errors,
         "macro_score": macro_score,

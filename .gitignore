@@ -1,0 +1,9 @@
+# Local research videos & temporary artifacts (do not deploy to GitHub Pages)
+vids/
+*.mp4
+*.mov
+*.mkv
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

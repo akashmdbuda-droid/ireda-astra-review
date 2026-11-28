@@ -40,11 +40,14 @@ jobs:
       - name: Run daily market update and auto-grade predictions
         run: python3 scripts/daily_update.py
 
+      - name: Run Nifty 50 & IREDA Demand/Supply swing scanner
+        run: python3 scripts/demand_supply_scanner.py
+
       - name: Commit and push updated cockpit state
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add cockpit_state.json daily_ledger.jsonl daily_history.jsonl
+          git add cockpit_state.json daily_ledger.jsonl daily_history.jsonl demand_supply_state.json swing_ledger.jsonl
           if git diff --staged --quiet; then
             echo "No state changes to commit."
             exit 0

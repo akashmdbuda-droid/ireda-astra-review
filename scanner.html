@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <script>
+    try {
+      document.querySelector('meta[name="color-scheme"]').content = localStorage.getItem("color-scheme") ?? "light dark";
+    } catch (e) {}
+  </script>
+  <title>Nifty 50 &amp; IREDA Demand &amp; Supply Swing Scanner — Top-Down Strategy</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%230b1220'/><rect x='2' y='10' width='12' height='3' rx='1' fill='%2322c55e'/><path d='M3 10L7 6L10 8L13 3' stroke='%2338bdf8' stroke-width='1.8' fill='none'/></svg>" />
+  <script src="https://code.highcharts.com/stock/highstock.js"></script>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: light-dark(#f1f5f9, #070d19);
+      --card: light-dark(#ffffff, #0f172a);
+      --card-2: light-dark(#f8fafc, #0b1220);
+      --border: light-dark(#cbd5e1, #1e293b);
+      --fg: light-dark(#0f172a, #f8fafc);
+      --muted: light-dark(#475569, #94a3b8);
+      --accent: light-dark(#0284c7, #38bdf8);
+      --accent-ink: light-dark(#ffffff, #020617);
+      --green: light-dark(#15803d, #22c55e);
+      --amber: light-dark(#b45309, #f59e0b);
+      --red: light-dark(#dc2626, #ef4444);
+      --purple: light-dark(#7c3aed, #a855f7);
+      --row-hover: light-dark(#f1f5f9, #131f35);
+      --sticky-bg: light-dark(#ffffff, #0f172a);
+      --thead-bg: light-dark(#f8fafc, #0c1527);
+    }
+    :root:has(> head > meta[name="color-scheme"][content="dark"]) { color-scheme: dark; }
+    :root:has(> head > meta[name="color-scheme"][content="light"]) { color-scheme: light; }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .wrap { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .muted { color: var(--muted); }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    /* Topbar & Controls */
+    .topbar {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    .nav-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+    .btn {
+      background: var(--card-2); color: var(--fg); border: 1px solid var(--border);
+      border-radius: 7px; padding: 6px 11px; font-size: 12px; font-weight: 600; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+      min-block-size: 30px;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .btn.primary { border-color: var(--accent); color: var(--accent); }
+    .btn.primary:hover { background: var(--accent); color: var(--accent-ink); }
+    .btn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    .btn:disabled { opacity: 0.6; cursor: wait; }
+
+    /* KPI Strip */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+    @media (max-width: 980px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 520px) { .kpi-grid { grid-template-columns: 1fr; } }
+    .kpi {
+      background: var(--card); border: 1px solid var(--border); border-radius: 11px;
+      padding: 12px 14px; display: flex; flex-direction: column; gap: 3px;
+    }
+    .kpi-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+    .kpi-val { font-size: 20px; font-weight: 800; }
+    .kpi-sub { font-size: 11.5px; color: var(--muted); }
+
+    /* Accessible Single-Row Tablist (modern-web-guidance: tabs) */
+    .tabs-shell { display: flex; flex-direction: column; gap: 12px; }
+    .tablist {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+      scroll-snap-type: inline proximity;
+      scrollbar-width: thin;
+    }
+    .tablist [role="tab"] {
+      flex: none;
+      position: relative;
+      background: transparent;
+      color: var(--muted);
+      border: none;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      scroll-snap-align: start;
+      min-block-size: 40px;
+    }
+    .tablist [role="tab"]:hover { color: var(--fg); }
+    .tablist [role="tab"]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .tablist [role="tab"][aria-selected="true"] {
+      color: var(--accent);
+    }
+    /* Mandatory non-color shape indicator via pseudo-element border (WCAG 1.4.1 & Forced Colors safe) */
+    .tablist [role="tab"][aria-selected="true"]::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      border-block-end: 3px solid var(--accent);
+    }
+    /* Keep panels stack-safe for hidden="until-found": block flow with ZERO gap/padding/border on panel element
+       so hidden="until-found" collapses to 0px and NEVER overlays or intercepts pointer clicks on the active panel */
+    .tabpanels-stack { display: block; }
+    .tabpanels-stack > [role="tabpanel"] { min-width: 0; }
+    .tabpanels-stack > [role="tabpanel"][hidden] { pointer-events: none; }
+    .panel-inner { display: flex; flex-direction: column; gap: 14px; }
+
+    /* Filters Bar */
+    .filter-bar {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .pill-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .pill-btn {
+      background: var(--card-2); color: var(--muted); border: 1px solid var(--border);
+      border-radius: 7px; padding: 5px 10px; font-size: 12px; font-weight: 700; cursor: pointer;
+      min-block-size: 30px;
+    }
+    .pill-btn:hover { border-color: var(--accent); color: var(--fg); }
+    .pill-btn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    .search-box, .sel-box {
+      background: var(--card-2); color: var(--fg); border: 1px solid var(--border);
+      border-radius: 7px; padding: 6px 10px; font-size: 12.5px; min-block-size: 32px;
+    }
+    .search-box { width: 200px; max-width: 100%; }
+
+    /* Badges */
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;
+      border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .badge.ACTIONABLE_NOW, .badge.HIGH_SYNC, .badge.TARGET_2 { color: var(--green); border-color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); }
+    .badge.APPROACHING, .badge.BUILDING, .badge.T1_TRAIL { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .badge.CONFLUENCE_RADAR { color: var(--purple); border-color: var(--purple); background: color-mix(in srgb, var(--purple) 12%, transparent); }
+    .badge.IN_SUPPLY_WAIT, .badge.STRETCHED, .badge.STOP_LOSS { color: var(--red); border-color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+    .badge.NO_LOCATION, .badge.TIME_EXIT { color: var(--muted); border-color: var(--border); }
+    .badge.ONE_RED { color: var(--amber); border-color: var(--amber); background: color-mix(in srgb, var(--amber) 14%, transparent); }
+    .badge.FOCUS { color: var(--purple); border-color: var(--purple); font-size: 10px; padding: 1px 5px; }
+
+    /* Responsive + Sortable Table (modern-web-guidance: responsive-table + sortable-table) */
+    .table-wrapper {
+      overflow: auto;
+      max-inline-size: 100%;
+      max-block-size: min(680px, 76vh);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--card);
+      container-type: inline-size;
+    }
+    .table-wrapper:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    table.ds-table {
+      width: 100%;
+      min-inline-size: 980px;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12.5px;
+    }
+    table.ds-table caption {
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--thead-bg);
+    }
+    table.ds-table thead {
+      position: sticky;
+      inset-block-start: 0;
+      z-index: 3;
+      background: var(--thead-bg);
+    }
+    table.ds-table th, table.ds-table td {
+      padding: 9px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    table.ds-table thead th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      font-weight: 700;
+      white-space: nowrap;
+      background: var(--thead-bg);
+    }
+    /* Drop cell padding only on th:has(> button) so button fills target >= 24px */
+    table.ds-table thead th:has(> button) { padding: 0; }
+    table.ds-table thead th > button {
+      width: 100%;
+      min-block-size: 36px;
+      padding: 8px 10px;
+      background: transparent;
+      border: none;
+      color: inherit;
+      font: inherit;
+      text-transform: inherit;
+      letter-spacing: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      cursor: pointer;
+    }
+    table.ds-table thead th > button:hover { color: var(--fg); }
+    table.ds-table thead th > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .sort-ico { font-size: 10px; opacity: 0.45; }
+    th[aria-sort="ascending"] .sort-ico::after { content: "▲"; opacity: 1; color: var(--accent); }
+    th[aria-sort="descending"] .sort-ico::after { content: "▼"; opacity: 1; color: var(--accent); }
+    th:not([aria-sort]) .sort-ico::after { content: "⇅"; }
+    th[aria-sort] > button { color: var(--accent); }
+
+    table.ds-table tbody th {
+      position: sticky;
+      inset-inline-start: 0;
+      z-index: 2;
+      background: var(--sticky-bg);
+      font-weight: 700;
+      border-right: 1px solid var(--border);
+      min-inline-size: 155px;
+    }
+    table.ds-table tbody tr:hover td,
+    table.ds-table tbody tr:hover th { background: var(--row-hover); }
+    table.ds-table tbody tr[hidden] { display: none; }
+
+    /* Container-query responsive stacked cards for narrow viewports */
+    @container (width < 700px) {
+      table.ds-table {
+        min-inline-size: 0;
+        --label-2: "CMP / 1D";
+        --label-3: "Tier / Score";
+        --label-4: "Demand Zone";
+        --label-5: "Dist %";
+        --label-6: "Swing Plan";
+        --label-7: "Overhead Supply";
+        --label-8: "Chart";
+      }
+      table.ds-table, table.ds-table thead, table.ds-table tbody,
+      table.ds-table tr, table.ds-table th, table.ds-table td { display: block; }
+      table.ds-table thead { display: none; }
+      table.ds-table tbody tr {
+        margin: 10px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--card-2);
+      }
+      table.ds-table tbody th {
+        position: sticky;
+        inset-block-start: 0;
+        z-index: 2;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        background: var(--thead-bg);
+      }
+      table.ds-table tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 10px;
+      }
+      table.ds-table tbody td::before {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+      table.ds-table tbody td:nth-child(2)::before { content: var(--label-2) ": "; }
+      table.ds-table tbody td:nth-child(3)::before { content: var(--label-3) ": "; }
+      table.ds-table tbody td:nth-child(4)::before { content: var(--label-4) ": "; }
+      table.ds-table tbody td:nth-child(5)::before { content: var(--label-5) ": "; }
+      table.ds-table tbody td:nth-child(6)::before { content: var(--label-6) ": "; }
+      table.ds-table tbody td:nth-child(7)::before { content: var(--label-7) ": "; }
+      table.ds-table tbody td:nth-child(8)::before { content: var(--label-8) ": "; }
+    }
+
+    /* Cards Grid (Focus & Sector Tabs) */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    @media (max-width: 1020px) { .cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 640px) { .cards-grid { grid-template-columns: 1fr; } }
+    .subcard {
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .subcard.highlight { border-color: var(--accent); }
+    .two-col { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; }
+    @media (max-width: 880px) { .two-col { grid-template-columns: 1fr; } }
+
+    .simple-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .simple-table th, .simple-table td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--border); }
+    .simple-table th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* Native Modal Dialog (modern-web-guidance: dialog + light-dismiss-a-dialog) */
+    dialog {
+      width: min(1060px, calc(100vw - 24px));
+      max-height: calc(100dvh - 28px);
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--card);
+      color: var(--fg);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+    }
+    /* Mandatory: scope display to dialog[open] and contain scroll on dialog:modal & ::backdrop */
+    dialog[open] {
+      display: flex;
+      flex-direction: column;
+    }
+    dialog:modal {
+      overscroll-behavior: contain;
+    }
+    dialog::backdrop {
+      background: rgba(2, 6, 23, 0.68);
+      backdrop-filter: blur(3px);
+      overflow: hidden;
+      overscroll-behavior: contain;
+    }
+    .dlg-head {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--card-2);
+    }
+    .dlg-head h1 { margin: 0; font-size: 17px; font-weight: 800; }
+    .dlg-body {
+      padding: 14px 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .hc-box {
+      width: 100%; height: 430px;
+      border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card-2);
+    }
+    .ticket-grid {
+      display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px;
+    }
+    @media (max-width: 760px) { .ticket-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .ticket-box {
+      background: var(--card-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px;
+    }
+    .sizer-row {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 10px 12px; border-radius: 9px; background: var(--card-2); border: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .sizer-row input {
+      width: 105px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--card); color: var(--fg); font-size: 12px;
+    }
+
+    .refresh-panel {
+      display: none; padding: 10px 12px; border-radius: 10px; font-size: 12px;
+      background: var(--card); border: 1px solid var(--border);
+      flex-direction: column; gap: 8px;
+    }
+    .refresh-panel.open { display: flex; }
+    .refresh-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Top Navigation Bar -->
+    <header class="topbar">
+      <div>
+        <div style="font-size:18px;font-weight:800;letter-spacing:-0.01em;">Nifty 50 &amp; IREDA · Demand &amp; Supply Swing Scanner</div>
+        <div class="mono muted" style="font-size:11.5px;" id="metaLine">Loading demand_supply_state.json…</div>
+      </div>
+      <nav class="nav-links" aria-label="Site navigation">
+        <button type="button" class="btn primary" id="btnRefreshNow" title="Trigger live GitHub Actions scan (~35s) or reload latest JSON">↻ Refresh Scan</button>
+        <a class="btn" href="./cockpit.html">IREDA Daily Cockpit</a>
+        <a class="btn" href="./index.html">Astra Dashboard</a>
+        <a class="btn" href="./review.html">Astra Bundle</a>
+        <button type="button" class="btn" id="btnTheme" aria-label="Toggle color scheme">Theme</button>
+      </nav>
+    </header>
+
+    <div id="refreshPanel" class="refresh-panel" role="status">
+      <div class="refresh-row">
+        <div id="refreshStatus" class="mono" style="font-weight:700;">Ready.</div>
+        <div class="pill-row">
+          <a class="btn" target="_blank" rel="noopener" href="https://github.com/akashmdbuda-droid/ireda-astra-review/actions/workflows/daily_cockpit.yml">GitHub Actions ↗</a>
+          <button type="button" class="btn" id="btnCloseRefresh">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top KPI Strip -->
+    <section class="kpi-grid" aria-label="Scanner summary metrics">
+      <div class="kpi">
+        <span class="kpi-lbl">Tier 1 · Actionable Now</span>
+        <span class="kpi-val mono" id="kpiAct" style="color:var(--green)">—</span>
+        <span class="kpi-sub" id="kpiActSub">Inside or ≤4% above Fresh DZ</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-lbl">Tier 2 · Approaching Alerts</span>
+        <span class="kpi-val mono" id="kpiApp" style="color:var(--accent)">—</span>
+        <span class="kpi-sub">Set GTT / H1-M alert (4%–10.5%)</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-lbl">IREDA Live D&amp;S Status</span>
+        <span class="kpi-val mono" id="kpiIreda">—</span>
+        <span class="kpi-sub" id="kpiIredaSub">Loading IREDA levels…</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-lbl">Nifty 50 Trend Breadth</span>
+        <span class="kpi-val mono" id="kpiBreadth">—</span>
+        <span class="kpi-sub" id="kpiBreadthSub">Above 200D / 20W / 20M EMA</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-lbl">Walk-Forward Strategy (4Y)</span>
+        <span class="kpi-val mono" id="kpiBt" style="color:var(--amber)">—</span>
+        <span class="kpi-sub" id="kpiBtSub">Nifty 50 after 0.25% costs</span>
+      </div>
+    </section>
+
+    <!-- Accessible Single-Row Tabs (modern-web-guidance: tabs) -->
+    <div class="tabs-shell">
+      <div class="tablist" id="mainTablist" focusgroup="tablist nomemory" role="tablist" aria-label="Scanner views">
+        <button type="button" role="tab" id="tab-scanner" aria-selected="true" focusgroupstart>Nifty 50 &amp; IREDA Scanner</button>
+        <button type="button" role="tab" id="tab-ireda" aria-selected="false">IREDA + Power Basket</button>
+        <button type="button" role="tab" id="tab-sectors" aria-selected="false">Sector Sync Heatmap</button>
+        <button type="button" role="tab" id="tab-strategy" aria-selected="false">Swing Strategy &amp; 4Y Backtest</button>
+      </div>
+
+      <div class="tabpanels-stack">
+        <!-- TAB 1: FULL NIFTY 50 + IREDA SORTABLE SCANNER -->
+        <div role="tabpanel" id="panel-scanner" aria-labelledby="tab-scanner" tabindex="0">
+          <div class="panel-inner">
+            <section class="card">
+              <div class="filter-bar">
+                <div class="pill-row" id="filterPills" role="group" aria-label="Quick filters">
+                  <button type="button" class="pill-btn active" data-filter="ALL">All (59)</button>
+                  <button type="button" class="pill-btn" data-filter="NIFTY50">Nifty 50</button>
+                  <button type="button" class="pill-btn" data-filter="IREDA_POWER">IREDA &amp; Power</button>
+                  <button type="button" class="pill-btn" data-filter="ACTIONABLE_NOW">Tier 1: Actionable</button>
+                  <button type="button" class="pill-btn" data-filter="APPROACHING">Tier 2: Approaching</button>
+                  <button type="button" class="pill-btn" data-filter="ONE_RED">1-Red in Rally ★</button>
+                  <button type="button" class="pill-btn" data-filter="MTF_SYNC">Multi-TF Sync (2+)</button>
+                </div>
+                <div class="pill-row">
+                  <label class="sr-only" for="sectorFilter">Filter by sector</label>
+                  <select id="sectorFilter" class="sel-box">
+                    <option value="ALL">All Sectors</option>
+                  </select>
+                  <label class="sr-only" for="searchInput">Search stock symbol or name</label>
+                  <input id="searchInput" type="search" class="search-box" placeholder="Search symbol (e.g. IREDA, TITAN)…" />
+                </div>
+              </div>
+            </section>
+
+            <div id="sortStatus" role="status" class="sr-only"></div>
+
+            <div tabindex="0" role="region" aria-labelledby="scannerCaption" class="table-wrapper">
+              <table id="scannerTable" class="ds-table">
+                <caption id="scannerCaption">
+                  Click any column header to sort · Click any stock's <strong>Chart</strong> button to inspect Monthly/Weekly/Daily Demand &amp; Supply Zones and compute CNC position sizing.
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" data-type="text"><button type="button" commandfor="scannerTable" command="--sort"><span>Stock / Sector</span><span class="sort-ico" aria-hidden="true"></span></button></th>
+                    <th scope="col" data-type="number"><button type="button" commandfor="scannerTable" command="--sort"><span>CMP (₹)</span><span class="sort-ico" aria-hidden="true"></span></button></th>
+                    <th scope="col" data-type="number"><button type="button" commandfor="scannerTable" command="--sort"><span>Tier &amp; Score</span><span class="sort-ico" aria-hidden="true"></span></button></th>
+                    <th scope="col" data-type="number"><button type="button" commandfor="scannerTable" command="--sort"><span>Best Demand Zone</span><span class="sort-ico" aria-hidden="true"></span></button></th>
+                    <th scope="col" data-type="number"><button type="button" commandfor="scannerTable" command="--sort"><span>Dist %</span><span class="sort-ico" aria-hidden="true"></span></button></th>
+                    <th scope="col" data-type="number"><button type="button" commandfor="scannerTable" command="--sort"><span>Swing Plan (R:R)</span><span class="sort-ico" aria-hidden="true"></span></button></th>
+                    <th scope="col" data-type="number"><button type="button" commandfor="scannerTable" command="--sort"><span>Overhead Supply</span><span class="sort-ico" aria-hidden="true"></span></button></th>
+                    <th scope="col">Inspect</th>
+                  </tr>
+                </thead>
+                <tbody id="scannerBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: IREDA + POWER BASKET (ANKUR VIDEO PLAYBOOK) -->
+        <div role="tabpanel" id="panel-ireda" aria-labelledby="tab-ireda" hidden="until-found">
+          <div class="panel-inner">
+            <section class="card">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+                <div>
+                  <strong style="font-size:15px;">IREDA.NS — Young-IPO Demand &amp; Supply Playbook (Adapted Q+M+W Stack)</strong>
+                  <div class="muted" style="font-size:12px;">Listed 29 Nov 2023 (4 Yearly / 7 Half-Yearly candles) → anchor shifted from Y+H+Q to Quarterly + Monthly + Weekly.</div>
+                </div>
+                <button type="button" class="btn primary" id="btnOpenIredaModal">Open IREDA Interactive D&amp;S Chart →</button>
+              </div>
+              <div class="cards-grid">
+                <div class="subcard highlight">
+                  <div class="mono" style="font-weight:800;color:var(--accent);">PLAN A · Primary Swing Pullback</div>
+                  <div class="mono" style="font-size:16px;font-weight:800;">Buy ₹114.54 – ₹118.30</div>
+                  <div class="muted" style="font-size:12px;">Fresh follow-up <strong>RBR-W + RBR-D</strong> launched by 118M-share candle + Daily 20/50 EMA confluence. Hard stop: Weekly close &lt; <strong>₹110.40</strong>.</div>
+                </div>
+                <div class="subcard">
+                  <div class="mono" style="font-weight:800;color:var(--green);">PLAN B · Sector-Drag Deep Retest</div>
+                  <div class="mono" style="font-size:16px;font-weight:800;">Accumulate ₹95.55 – ₹103.85</div>
+                  <div class="muted" style="font-size:12px;">3-yr-old IPO <strong>1-Red-Candle Weekly DZ</strong> core + Nov 3 1-Red Daily DZ inside 2024-Q1 floor (where Oct 26 ₹98.78 launched +35%). Invalidation &lt; ₹95.55.</div>
+                </div>
+                <div class="subcard">
+                  <div class="mono" style="font-weight:800;color:var(--amber);">PLAN C · F1-M Achievement Breakout</div>
+                  <div class="mono" style="font-size:16px;font-weight:800;">Close &gt; ₹142.85 (Apr Peak)</div>
+                  <div class="muted" style="font-size:12px;">Currently capped by <strong>RBD-M Supply (₹128.69–₹137.45)</strong> + Monthly 20 EMA (₹132.4). A close &gt; ₹142.85 opens clean upside to <strong>₹166.2–₹186.6</strong>.</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div style="margin-bottom:10px;">
+                <strong style="font-size:15px;">IREDA vs. Power Finance (RECLTD, PFC, HUDCO) vs. Video Power Basket (ADANIPOWER, TATAPOWER, JPPOWER)</strong>
+                <div class="muted" style="font-size:12px;">Ankur Agarwal's Sector Synchronization Check — click any card to inspect live Demand &amp; Supply charts.</div>
+              </div>
+              <div id="focusBasketGrid" class="cards-grid"></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- TAB 3: SECTOR SYNCHRONIZATION HEATMAP -->
+        <div role="tabpanel" id="panel-sectors" aria-labelledby="tab-sectors" hidden="until-found">
+          <div class="panel-inner">
+            <section class="card">
+              <div style="margin-bottom:10px;">
+                <strong style="font-size:15px;">Ankur Agarwal Sector Synchronization Matrix (True HTF Demand Proximity)</strong>
+                <div class="muted" style="font-size:12px;">High conviction arises when multiple stocks in the same sector reach their Higher-Timeframe (Y/H/Q/M) Demand Zones together.</div>
+              </div>
+              <div id="sectorGrid" class="cards-grid"></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- TAB 4: SWING STRATEGY RULES & 4-YEAR WALK-FORWARD BACKTEST -->
+        <div role="tabpanel" id="panel-strategy" aria-labelledby="tab-strategy" hidden="until-found">
+          <div class="panel-inner">
+            <div class="two-col">
+              <section class="card">
+                <strong style="font-size:15px;">Codified Demand &amp; Supply Swing Strategy Rules</strong>
+                <ol id="strategyRulesList" style="margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:8px;font-size:13px;"></ol>
+              </section>
+              <section class="card">
+                <strong style="font-size:15px;">Empirical 4-Year Nifty 50 Walk-Forward Backtest</strong>
+                <p id="btMethodText" class="muted" style="font-size:12px;margin:6px 0 10px;"></p>
+                <table class="simple-table">
+                  <thead>
+                    <tr>
+                      <th>Strategy Filter Bucket</th>
+                      <th>Trades</th>
+                      <th>Win %</th>
+                      <th>PF</th>
+                      <th>Exp (R)</th>
+                      <th>Max DD</th>
+                    </tr>
+                  </thead>
+                  <tbody id="btBucketsBody"></tbody>
+                </table>
+              </section>
+            </div>
+
+            <section class="card">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+                <strong style="font-size:15px;">Live Forward Auto-Graded Swing Ledger (swing_ledger.jsonl)</strong>
+                <span id="fwdStatsChip" class="mono muted" style="font-size:12px;">—</span>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="simple-table mono">
+                  <thead>
+                    <tr>
+                      <th>Symbol</th>
+                      <th>Logged / Due</th>
+                      <th>Zone Sync</th>
+                      <th>Entry Band ₹</th>
+                      <th>Stop ₹</th>
+                      <th>T1 / T2 ₹</th>
+                      <th>Status</th>
+                      <th>Outcome / Note</th>
+                    </tr>
+                  </thead>
+                  <tbody id="fwdLedgerBody"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="card">
+              <strong style="font-size:15px;">Recent Walk-Forward Backtest Trades (Zero-Lookahead · Net of 0.25% Costs)</strong>
+              <div style="overflow-x:auto;margin-top:8px;">
+                <table class="simple-table mono">
+                  <thead>
+                    <tr>
+                      <th>Symbol</th>
+                      <th>TF / Tags</th>
+                      <th>Entry Date</th>
+                      <th>Exit Date</th>
+                      <th>Entry ₹</th>
+                      <th>Stop ₹</th>
+                      <th>Exit ₹</th>
+                      <th>Days</th>
+                      <th>Net %</th>
+                      <th>R-Mult</th>
+                      <th>Outcome</th>
+                    </tr>
+                  </thead>
+                  <tbody id="btTradesBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Native Modal Dialog for Interactive Stock Chart & Swing Ticket (modern-web-guidance: dialog + light-dismiss-a-dialog) -->
+  <dialog id="stockDialog" closedby="any" aria-labelledby="dlgTitle">
+    <div class="dlg-head">
+      <div>
+        <h1 id="dlgTitle">—</h1>
+        <div id="dlgMeta" class="mono muted" style="font-size:12px;margin-top:2px;">—</div>
+      </div>
+      <div class="pill-row">
+        <button type="button" class="pill-btn dlg-tf" data-tf="M">Monthly</button>
+        <button type="button" class="pill-btn dlg-tf active" data-tf="W">Weekly</button>
+        <button type="button" class="pill-btn dlg-tf" data-tf="D">Daily</button>
+        <button type="button" class="pill-btn active" id="btnDlgLabels" title="Toggle Demand & Supply text labels on chart">Labels</button>
+        <form method="dialog" style="display:inline;">
+          <button type="submit" class="btn" autofocus>Close ✕</button>
+        </form>
+      </div>
+    </div>
+    <div class="dlg-body">
+      <div id="dlgActionNote" class="subcard" style="padding:9px 12px;font-size:12.5px;font-weight:600;">—</div>
+      <div id="dlgChart" class="hc-box"></div>
+      <div id="dlgTicket" class="ticket-grid"></div>
+      <div class="sizer-row">
+        <div class="pill-row">
+          <strong style="color:var(--fg);">CNC Position Sizer (browser-local):</strong>
+          <label class="muted">Capital ₹ <input id="szCapital" type="number" min="10000" step="10000" value="500000" class="mono" /></label>
+          <label class="muted">Risk % <input id="szRiskPct" type="number" min="0.25" max="5" step="0.25" value="1.0" class="mono" /></label>
+        </div>
+        <div id="szOutput" class="mono" style="font-weight:700;">—</div>
+      </div>
+      <div>
+        <strong style="font-size:13px;">Active Multi-Timeframe Zones Plotted (Y / H / Q / M / W / D)</strong>
+        <div style="overflow-x:auto;margin-top:6px;">
+          <table class="simple-table mono">
+            <thead>
+              <tr>
+                <th>Kind</th>
+                <th>TF</th>
+                <th>Pattern</th>
+                <th>Distal – Proximal (₹)</th>
+                <th>Freshness</th>
+                <th>Achievement</th>
+                <th>Leg-Out</th>
+              </tr>
+            </thead>
+            <tbody id="dlgZonesBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    (function () {
+      let DATA = null;
+      let activeFilter = "ALL";
+      let activeSector = "ALL";
+      let searchQuery = "";
+      let modalStock = null;
+      let modalTf = "W";
+      let modalShowLabels = true;
+      let modalChart = null;
+      const rowMap = new Map(); // symbol -> <tr>
+
+      const GH_REPO = "akashmdbuda-droid/ireda-astra-review";
+      const GH_WORKFLOW = "daily_cockpit.yml";
+      const GH_TOKEN_KEY = "ireda_cockpit_gh_pat_v1";
+      const SIZER_KEY = "ds_scanner_sizer_v1";
+
+      // ===== 1. DARK MODE TWO-STATE TOGGLE (modern-web-guidance: dark-mode-toggle) =====
+      const colorMeta = document.querySelector('meta[name="color-scheme"]');
+      function getSystemScheme() {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      function getRenderedScheme() {
+        const stored = colorMeta.content;
+        if (stored === "dark" || stored === "light") return stored;
+        return getSystemScheme();
+      }
+      function syncThemeBtn() {
+        const cur = getRenderedScheme();
+        const btn = document.getElementById("btnTheme");
+        btn.textContent = cur === "dark" ? "☀ Light" : "☾ Dark";
+        btn.title = `Current theme: ${cur} (click to switch)`;
+      }
+      document.getElementById("btnTheme").addEventListener("click", () => {
+        const target = getRenderedScheme() === "dark" ? "light" : "dark";
+        const sys = getSystemScheme();
+        try {
+          if (target === sys) {
+            localStorage.removeItem("color-scheme");
+            colorMeta.content = "light dark";
+          } else {
+            localStorage.setItem("color-scheme", target);
+            colorMeta.content = target;
+          }
+        } catch (e) {
+          colorMeta.content = target;
+        }
+        syncThemeBtn();
+        if (modalStock && document.getElementById("stockDialog").open) renderModalChart();
+      });
+      window.addEventListener("storage", (e) => {
+        if (e.key === "color-scheme") {
+          colorMeta.content = e.newValue ?? "light dark";
+          syncThemeBtn();
+          if (modalStock && document.getElementById("stockDialog").open) renderModalChart();
+        }
+      });
+      syncThemeBtn();
+
+      // ===== 2. ACCESSIBLE TABS WITH BEFORE-MATCH & KEYBOARD FALLBACK (modern-web-guidance: tabs) =====
+      const tablist = document.getElementById("mainTablist");
+      const tabs = [...tablist.querySelectorAll('[role="tab"]')];
+      const panels = tabs.map((t) => document.getElementById(t.id.replace("tab-", "panel-")));
+
+      function activateTab(selectedTab, moveFocus = false) {
+        tabs.forEach((tab, idx) => {
+          const isSel = tab === selectedTab;
+          tab.setAttribute("aria-selected", String(isSel));
+          tab.toggleAttribute("focusgroupstart", isSel);
+          tab.tabIndex = isSel ? 0 : -1;
+          const panel = panels[idx];
+          if (isSel) {
+            panel.hidden = false;
+            panel.tabIndex = 0;
+          } else {
+            panel.hidden = "until-found";
+            panel.removeAttribute("tabindex");
+          }
+        });
+        if (moveFocus) selectedTab.focus();
+        selectedTab.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
+      tabs.forEach((tab, idx) => {
+        tab.tabIndex = idx === 0 ? 0 : -1;
+        tab.addEventListener("click", () => activateTab(tab, false));
+        tab.addEventListener("keydown", (e) => {
+          if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) return;
+          e.preventDefault();
+          const cur = tabs.indexOf(tab);
+          let next = cur;
+          if (e.key === "ArrowRight") next = (cur + 1) % tabs.length;
+          else if (e.key === "ArrowLeft") next = (cur - 1 + tabs.length) % tabs.length;
+          else if (e.key === "Home") next = 0;
+          else if (e.key === "End") next = tabs.length - 1;
+          activateTab(tabs[next], true);
+        });
+        // Auto-reveal hidden="until-found" panel on Ctrl+F find-in-page
+        panels[idx].addEventListener("beforematch", () => activateTab(tab, false));
+      });
+
+      // ===== 3. SORTABLE TABLE WITH INVOKER COMMANDS + IN-PLACE ROW REORDERING =====
+      const scannerTable = document.getElementById("scannerTable");
+      const scannerBody = document.getElementById("scannerBody");
+      const sortStatus = document.getElementById("sortStatus");
+      const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+      function sortBy(button) {
+        const th = button.closest("th");
+        if (!th) return;
+        const direction = th.getAttribute("aria-sort") === "ascending" ? "descending" : "ascending";
+        for (const header of scannerTable.tHead.rows[0].cells) header.removeAttribute("aria-sort");
+        th.setAttribute("aria-sort", direction);
+
+        const colIdx = th.cellIndex;
+        const type = th.dataset.type || "text";
+        const factor = direction === "ascending" ? 1 : -1;
+        const rows = [...scannerBody.rows];
+        const keyed = rows.map((row) => {
+          const cell = row.cells[colIdx];
+          const raw = cell.dataset.value ?? cell.textContent.trim();
+          return { row, val: type === "number" ? Number(raw) : raw };
+        });
+        keyed.sort((a, b) => factor * (type === "number" ? a.val - b.val : collator.compare(a.val, b.val)));
+
+        const doReorder = () => {
+          for (const item of keyed) {
+            if (typeof scannerBody.moveBefore === "function") scannerBody.moveBefore(item.row, null);
+            else scannerBody.appendChild(item.row);
+          }
+        };
+        if (typeof scannerTable.startViewTransition === "function") {
+          scannerTable.startViewTransition(doReorder);
+        } else {
+          doReorder();
+        }
+        const visibleCount = keyed.filter((k) => !k.row.hidden).length;
+        sortStatus.textContent = `Sorted by ${button.textContent.trim()}, ${direction}, ${visibleCount} visible rows`;
+      }
+
+      scannerTable.addEventListener("command", (event) => {
+        if (event.command === "--sort") sortBy(event.source);
+      });
+      // Mandatory feature-detected fallback so supporting browsers never double-sort
+      if (!("commandForElement" in HTMLButtonElement.prototype)) {
+        for (const btn of scannerTable.tHead.querySelectorAll('button[command="--sort"]')) {
+          btn.addEventListener("click", () => sortBy(btn));
+        }
+      }
+
+      // ===== 4. NATIVE DIALOG LIGHT-DISMISS FALLBACK FOR SAFARI =====
+      const stockDialog = document.getElementById("stockDialog");
+      if (!("closedBy" in HTMLDialogElement.prototype)) {
+        const isOutside = (e, dlg) => {
+          const r = dlg.getBoundingClientRect();
+          return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+        };
+        let pressedOutside = false;
+        stockDialog.addEventListener("pointerdown", (e) => { pressedOutside = isOutside(e, stockDialog); });
+        stockDialog.addEventListener("pointerup", (e) => {
+          if (pressedOutside && isOutside(e, stockDialog)) stockDialog.close();
+        });
+      }
+      stockDialog.addEventListener("close", () => {
+        stockDialog.returnValue = "";
+        if (modalChart) { try { modalChart.destroy(); } catch (e) {} modalChart = null; }
+      });
+
+      // ===== 5. HELPERS & RENDERERS =====
+      const fmtNum = (n, d = 2) => (n === null || n === undefined || Number.isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
+      const fmtSign = (n) => `${n >= 0 ? "+" : ""}${Number(n).toFixed(1)}%`;
+      const tierLabel = {
+        ACTIONABLE_NOW: "TIER 1 · ACTIONABLE",
+        APPROACHING: "TIER 2 · APPROACHING",
+        CONFLUENCE_RADAR: "TIER 3 · HTF RADAR",
+        IN_SUPPLY_WAIT: "IN SUPPLY · WAIT",
+        NO_LOCATION: "NO LOCATION",
+      };
+
+      function getChartColors() {
+        const dark = getRenderedScheme() === "dark";
+        return dark
+          ? { bg: "#0b1220", plotBg: "#0f172a", grid: "#1e293b", border: "#334155", fg: "#f8fafc", muted: "#94a3b8", accent: "#38bdf8", tooltipBg: "#020617" }
+          : { bg: "#ffffff", plotBg: "#ffffff", grid: "#e2e8f0", border: "#cbd5e1", fg: "#0f172a", muted: "#475569", accent: "#0284c7", tooltipBg: "#ffffff" };
+      }
+
+      function applyFilters() {
+        if (!DATA) return;
+        const q = searchQuery.trim().toLowerCase();
+        let shown = 0;
+        for (const s of DATA.stocks) {
+          const tr = rowMap.get(s.symbol);
+          if (!tr) continue;
+          let ok = true;
+          if (activeFilter === "NIFTY50") ok = s.group === "NIFTY50";
+          else if (activeFilter === "IREDA_POWER") ok = s.group === "IREDA_POWER";
+          else if (activeFilter === "ACTIONABLE_NOW") ok = s.tier === "ACTIONABLE_NOW";
+          else if (activeFilter === "APPROACHING") ok = s.tier === "APPROACHING";
+          else if (activeFilter === "ONE_RED") ok = !!(s.best_dz && s.best_dz.has_1red);
+          else if (activeFilter === "MTF_SYNC") ok = !!(s.best_dz && s.best_dz.sync_count >= 2);
+
+          if (ok && activeSector !== "ALL") ok = s.sector === activeSector;
+          if (ok && q) ok = s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.sector.toLowerCase().includes(q);
+          tr.hidden = !ok;
+          if (ok) shown++;
+        }
+        document.getElementById("scannerCaption").innerHTML =
+          `Showing <strong>${shown}</strong> of ${DATA.stocks.length} stocks · Click any column header to sort · Click <strong>Chart</strong> to open interactive Monthly/Weekly/Daily Demand &amp; Supply Zones.`;
+      }
+
+      function buildScannerRows() {
+        scannerBody.innerHTML = "";
+        rowMap.clear();
+        for (const s of DATA.stocks) {
+          const dz = s.best_dz;
+          const sz = s.nearest_sz;
+          const tp = s.trade_plan;
+          const tr = document.createElement("tr");
+
+          const chgCol = s.chg_pct >= 0 ? "var(--green)" : "var(--red)";
+          const dzSortVal = dz ? dz.sync_count * 100 + (dz.has_1red ? 20 : 0) + (dz.freshness === "FRESH" ? 10 : 0) : 0;
+          const distSortVal = dz ? dz.dist_pct : 999;
+          const rrSortVal = tp ? tp.rr_t1 : 0;
+          const szSortVal = sz ? sz.dist_pct : 999;
+
+          const dzHtml = dz
+            ? `<div class="mono" style="font-weight:700;">${dz.sync_label} · ₹${fmtNum(dz.distal)}–₹${fmtNum(dz.proximal)}</div>
+               <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;">
+                 <span class="badge">${dz.freshness}</span>
+                 ${dz.ach !== "NO_BOS" ? `<span class="badge" style="color:var(--green);border-color:var(--green);">${dz.ach}</span>` : ""}
+                 ${dz.has_1red ? `<span class="badge ONE_RED">1-Red ★</span>` : ""}
+               </div>`
+            : `<span class="muted">No active DZ</span>`;
+
+          const planHtml = tp
+            ? `<div class="mono">Buy ₹${fmtNum(tp.entry_low)}–₹${fmtNum(tp.entry_high)}</div>
+               <div class="mono muted" style="font-size:11px;">SL ₹${fmtNum(tp.stop_loss)} (${tp.risk_pct}%) · T1 ₹${fmtNum(tp.target_1)} (<strong style="color:var(--green)">${tp.rr_t1}R</strong>)</div>`
+            : `<span class="muted">—</span>`;
+
+          const szHtml = sz
+            ? `<div class="mono">${sz.tf}: ₹${fmtNum(sz.proximal)}–₹${fmtNum(sz.distal)}</div>
+               <div class="mono muted" style="font-size:11px;">${sz.in_supply ? `<strong style="color:var(--red)">IN SUPPLY NOW</strong>` : `+${sz.dist_pct.toFixed(1)}% overhead`}</div>`
+            : `<span class="muted">Open sky / ATH</span>`;
+
+          tr.innerHTML = `
+            <th scope="row" data-value="${s.symbol}">
+              <div style="display:flex;align-items:center;gap:5px;">
+                <span class="mono" style="font-size:13px;">${s.symbol}</span>
+                ${s.group === "IREDA_POWER" ? `<span class="badge FOCUS">FOCUS</span>` : ""}
+              </div>
+              <div class="muted" style="font-size:11px;font-weight:500;">${s.sector}</div>
+            </th>
+            <td class="mono" data-value="${s.cmp}">
+              <div style="font-weight:700;">₹${fmtNum(s.cmp)}</div>
+              <div style="font-size:11px;color:${chgCol};">${fmtSign(s.chg_pct)} · 1M ${fmtSign(s.ret_1m)}</div>
+            </td>
+            <td data-value="${s.score}">
+              <div><span class="badge ${s.tier} mono">${tierLabel[s.tier] || s.tier}</span></div>
+              <div class="mono muted" style="font-size:11px;margin-top:3px;">Score: <strong style="color:var(--fg)">${s.score}/100</strong></div>
+            </td>
+            <td data-value="${dzSortVal}">${dzHtml}</td>
+            <td class="mono" data-value="${distSortVal}" style="font-weight:700;color:${distSortVal <= 4 ? "var(--green)" : distSortVal <= 10.5 ? "var(--accent)" : "var(--muted)"};">
+              ${dz ? `${dz.dist_pct >= 0 ? "+" : ""}${dz.dist_pct.toFixed(1)}%` : "—"}
+            </td>
+            <td data-value="${rrSortVal}">${planHtml}</td>
+            <td data-value="${szSortVal}">${szHtml}</td>
+            <td><button type="button" class="btn primary open-chart-btn" data-sym="${s.symbol}">Chart</button></td>
+          `;
+          scannerBody.appendChild(tr);
+          rowMap.set(s.symbol, tr);
+        }
+
+        scannerBody.querySelectorAll(".open-chart-btn").forEach((b) => {
+          b.addEventListener("click", () => openStockModal(b.dataset.sym));
+        });
+      }
+
+      function renderFocusBasket() {
+        const grid = document.getElementById("focusBasketGrid");
+        grid.innerHTML = "";
+        const focus = DATA.stocks.filter((s) => s.group === "IREDA_POWER");
+        for (const s of focus) {
+          const dz = s.best_dz;
+          const deep = s.deep_dz;
+          const sz = s.nearest_sz;
+          const div = document.createElement("div");
+          div.className = "subcard" + (s.symbol === "IREDA" ? " highlight" : "");
+          div.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+              <div>
+                <strong class="mono" style="font-size:14px;">${s.symbol}</strong>
+                <span class="muted" style="font-size:11.5px;margin-left:6px;">${s.sector}</span>
+              </div>
+              <span class="badge ${s.tier} mono">${s.score}/100</span>
+            </div>
+            <div class="mono" style="font-size:16px;font-weight:800;">₹${fmtNum(s.cmp)} <span style="font-size:11.5px;color:${s.ret_1m >= 0 ? "var(--green)" : "var(--red)"};">(1M ${fmtSign(s.ret_1m)} · ATH ${s.dd_ath_pct}%)</span></div>
+            <div class="mono" style="font-size:11.5px;">
+              <div><strong>Nearest DZ:</strong> ${dz ? `${dz.sync_label} ₹${fmtNum(dz.distal)}–₹${fmtNum(dz.proximal)} (${dz.dist_pct >= 0 ? "+" : ""}${dz.dist_pct.toFixed(1)}%)` : "—"}</div>
+              ${deep ? `<div><strong>Deep HTF Floor:</strong> ${deep.sync_label} ₹${fmtNum(deep.distal)}–₹${fmtNum(deep.proximal)} (+${deep.dist_pct.toFixed(1)}%)</div>` : ""}
+              <div><strong>Overhead Supply:</strong> ${sz ? `${sz.tf} ₹${fmtNum(sz.proximal)}–₹${fmtNum(sz.distal)}` : "None nearby"}</div>
+            </div>
+            <div class="muted" style="font-size:11.5px;">${s.action_note}</div>
+            <button type="button" class="btn primary" style="align-self:flex-start;margin-top:auto;" data-sym="${s.symbol}">Inspect ${s.symbol} Zones →</button>
+          `;
+          div.querySelector("button").addEventListener("click", () => openStockModal(s.symbol));
+          grid.appendChild(div);
+        }
+      }
+
+      function renderSectors() {
+        const grid = document.getElementById("sectorGrid");
+        grid.innerHTML = "";
+        for (const sec of DATA.sectors) {
+          const div = document.createElement("div");
+          div.className = "subcard";
+          const leaderBtns = sec.leaders.map((sym) => `<button type="button" class="pill-btn sec-sym-btn" data-sym="${sym}">${sym}</button>`).join("");
+          div.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+              <strong style="font-size:14px;">${sec.sector}</strong>
+              <span class="badge ${sec.verdict} mono">${sec.verdict.replace("_", " ")}</span>
+            </div>
+            <div class="mono" style="font-size:12px;">
+              <strong>${sec.actionable}</strong> Actionable · <strong>${sec.near_8pct}/${sec.count}</strong> (${sec.sync_pct}%) within 8% of HTF DZ
+            </div>
+            <div class="mono muted" style="font-size:11.5px;">
+              Median HTF Dist: <strong>${sec.median_dist_pct !== null ? `+${sec.median_dist_pct}%` : "—"}</strong> · Avg 1M: <strong style="color:${sec.avg_ret_1m >= 0 ? "var(--green)" : "var(--red)"}">${fmtSign(sec.avg_ret_1m)}</strong>
+            </div>
+            <div class="pill-row" style="margin-top:4px;">${leaderBtns}</div>
+          `;
+          div.querySelectorAll(".sec-sym-btn").forEach((b) => {
+            b.addEventListener("click", () => openStockModal(b.dataset.sym));
+          });
+          grid.appendChild(div);
+        }
+      }
+
+      function renderStrategyAndBacktest() {
+        const ul = document.getElementById("strategyRulesList");
+        ul.innerHTML = DATA.strategy_blueprint.principles.map((p) => {
+          const [head, ...rest] = p.split(":");
+          return `<li><strong>${head}:</strong>${rest.join(":")}</li>`;
+        }).join("");
+
+        const bt = DATA.backtest;
+        document.getElementById("btMethodText").textContent = bt.methodology;
+
+        const bBody = document.getElementById("btBucketsBody");
+        bBody.innerHTML = "";
+        const cap = bt.portfolio_capped || {};
+        const rows = [
+          ["ALL TRADES (Uncapped Baseline)", bt.overall],
+          ...(cap.max5_sec2 ? [["PORTFOLIO CAP (Max 5 Slots · Max 2/Sector)", cap.max5_sec2]] : []),
+          ...(cap.one_red_max5_sec2 ? [["★ 1-RED IN RALLY + PORTFOLIO CAP (5/2)", cap.one_red_max5_sec2]] : []),
+          ...Object.entries(bt.by_filter),
+        ];
+        for (const [label, st] of rows) {
+          const tr = document.createElement("tr");
+          const isBest = label.includes("1-Red") || label.includes("1-RED");
+          const isCap = label.includes("PORTFOLIO CAP");
+          tr.style.fontWeight = isBest || isCap || label.startsWith("ALL") ? "700" : "400";
+          const ddStr = st.max_dd_pct !== undefined ? `${st.max_dd_pct}%` : `${st.avg_ret_pct >= 0 ? "+" : ""}${st.avg_ret_pct}% avg`;
+          tr.innerHTML = `
+            <td>${label}</td>
+            <td class="mono">${st.trades}</td>
+            <td class="mono">${st.win_rate}%</td>
+            <td class="mono" style="color:${st.profit_factor >= 1.4 ? "var(--green)" : st.profit_factor >= 1.15 ? "var(--accent)" : "var(--muted)"}">${st.profit_factor}</td>
+            <td class="mono" style="color:${st.expectancy_r > 0 ? "var(--green)" : "var(--red)"}">${st.expectancy_r >= 0 ? "+" : ""}${st.expectancy_r}R</td>
+            <td class="mono">${ddStr}</td>
+          `;
+          bBody.appendChild(tr);
+        }
+
+        const fStats = DATA.forward_stats || {};
+        const fRows = DATA.forward_ledger || [];
+        document.getElementById("fwdStatsChip").textContent =
+          `${fStats.watching || 0} Watching · ${fStats.active || 0} Active · ${fStats.graded || 0} Graded` +
+          (fStats.hit_rate_pct !== null && fStats.hit_rate_pct !== undefined ? ` (${fStats.hit_rate_pct}% Hit)` : "");
+        const fBody = document.getElementById("fwdLedgerBody");
+        fBody.innerHTML = "";
+        for (const r of fRows) {
+          const tr = document.createElement("tr");
+          const bCls = r.status === "TARGET_2" || r.status === "T1_TRAIL" ? "TARGET_2"
+            : r.status === "ACTIVE" ? "ACTIONABLE_NOW"
+            : r.status === "STOP_LOSS" ? "STOP_LOSS"
+            : "APPROACHING";
+          tr.innerHTML = `
+            <td><strong>${r.symbol}</strong>${r.has_1red ? ` <span class="badge ONE_RED">1-Red</span>` : ""}</td>
+            <td class="muted">${r.logged_date.slice(5)} → ${r.due_date.slice(5)}</td>
+            <td>${r.sync_label}</td>
+            <td>₹${fmtNum(r.entry_low)}–₹${fmtNum(r.entry_high)}</td>
+            <td style="color:var(--red);">₹${fmtNum(r.stop_loss)}</td>
+            <td style="color:var(--green);">₹${fmtNum(r.target_1)} / ₹${fmtNum(r.target_2)}</td>
+            <td><span class="badge ${bCls}">${r.status}</span></td>
+            <td class="muted" style="font-family:inherit;">${r.outcome_note || "—"}</td>
+          `;
+          fBody.appendChild(tr);
+        }
+
+        const tBody = document.getElementById("btTradesBody");
+        tBody.innerHTML = "";
+        for (const t of bt.recent_trades) {
+          const tr = document.createElement("tr");
+          const tags = [t.tf, t.mtf_sync ? "MTF" : "", t.single_red ? "1-Red" : "", t.bos ? "BOS" : ""].filter(Boolean).join("·");
+          tr.innerHTML = `
+            <td><strong>${t.symbol}</strong></td>
+            <td class="muted">${tags}</td>
+            <td>${t.entry_date}</td>
+            <td>${t.exit_date}</td>
+            <td>₹${fmtNum(t.entry)}</td>
+            <td>₹${fmtNum(t.stop)}</td>
+            <td>₹${fmtNum(t.exit)}</td>
+            <td>${t.hold_days}d</td>
+            <td style="color:${t.ret_pct >= 0 ? "var(--green)" : "var(--red)"}">${t.ret_pct >= 0 ? "+" : ""}${t.ret_pct}%</td>
+            <td style="font-weight:700;color:${t.r_mult >= 0 ? "var(--green)" : "var(--red)"}">${t.r_mult >= 0 ? "+" : ""}${t.r_mult}R</td>
+            <td><span class="badge ${t.outcome}">${t.outcome}</span></td>
+          `;
+          tBody.appendChild(tr);
+        }
+      }
+
+      // ===== 6. MODAL CHART INSPECTOR + POSITION SIZER =====
+      function loadSizer() {
+        try {
+          const s = JSON.parse(localStorage.getItem(SIZER_KEY) || "null");
+          if (s && s.cap) document.getElementById("szCapital").value = s.cap;
+          if (s && s.risk) document.getElementById("szRiskPct").value = s.risk;
+        } catch (e) {}
+      }
+      function updateSizer() {
+        const cap = Number(document.getElementById("szCapital").value) || 0;
+        const rp = Number(document.getElementById("szRiskPct").value) || 1;
+        try { localStorage.setItem(SIZER_KEY, JSON.stringify({ cap, risk: rp })); } catch (e) {}
+        const out = document.getElementById("szOutput");
+        if (!modalStock || !modalStock.trade_plan || cap <= 0) {
+          out.textContent = "No active trade plan to size.";
+          return;
+        }
+        const tp = modalStock.trade_plan;
+        const riskBudget = cap * (rp / 100);
+        const riskPerShare = Math.max(tp.entry_high - tp.stop_loss, 0.05);
+        const qty = Math.max(1, Math.floor(riskBudget / riskPerShare));
+        const deployed = qty * tp.entry_high;
+        const maxLoss = qty * riskPerShare;
+        const t1Gain = qty * (tp.target_1 - tp.entry_high);
+        out.innerHTML =
+          `Qty: <span style="color:var(--accent)">${qty.toLocaleString("en-IN")} sh</span> · Deploy: ₹${Math.round(deployed).toLocaleString("en-IN")} · Risk: <span style="color:var(--red)">-₹${Math.round(maxLoss).toLocaleString("en-IN")}</span> · T1: <span style="color:var(--green)">+₹${Math.round(t1Gain).toLocaleString("en-IN")}</span>`;
+      }
+      document.getElementById("szCapital").addEventListener("input", updateSizer);
+      document.getElementById("szRiskPct").addEventListener("input", updateSizer);
+
+      function renderModalChart() {
+        if (!modalStock || typeof Highcharts === "undefined") return;
+        const bars = modalStock.charts[modalTf] || [];
+        if (!bars.length) return;
+        if (modalChart) { try { modalChart.destroy(); } catch (e) {} modalChart = null; }
+
+        const th = getChartColors();
+        const ohlc = bars.map((b) => [Date.parse(b[0] + "T00:00:00Z"), b[1], b[2], b[3], b[4]]);
+        const e20 = bars.map((b) => [Date.parse(b[0] + "T00:00:00Z"), b[5]]);
+        const e50 = bars.map((b) => [Date.parse(b[0] + "T00:00:00Z"), b[6]]);
+
+        // Ankur-style color-coded Demand & Supply plotBands (deduplicate close labels to avoid text overlap)
+        const plotBands = [];
+        const plotLines = [];
+        const usedLabelYs = [];
+        for (const z of modalStock.zones_plot) {
+          const isDem = z.kind === "DEMAND";
+          const yLow = Math.min(z.distal, z.proximal);
+          const yHigh = Math.max(z.distal, z.proximal);
+          const yMid = (yLow + yHigh) / 2;
+          const tooClose = usedLabelYs.some((py) => Math.abs(py - yMid) / Math.max(yMid, 1) < 0.038);
+          let bandColor = "rgba(56, 189, 248, 0.16)";
+          let lblColor = "#38bdf8";
+          if (!isDem) {
+            bandColor = "rgba(244, 63, 94, 0.15)";
+            lblColor = "#f43f5e";
+          } else if (["Y", "H", "Q"].includes(z.tf)) {
+            bandColor = "rgba(148, 163, 184, 0.20)";
+            lblColor = th.muted;
+          } else if (z.tf === "M") {
+            bandColor = "rgba(34, 197, 94, 0.17)";
+            lblColor = "#22c55e";
+          }
+          const band = {
+            from: yLow,
+            to: yHigh,
+            color: bandColor,
+            zIndex: 1,
+          };
+          if (modalShowLabels && !tooClose) {
+            usedLabelYs.push(yMid);
+            band.label = {
+              text: `${z.pattern} (₹${yLow}–₹${yHigh})`,
+              align: isDem ? "center" : "left",
+              x: isDem ? 0 : 8,
+              style: { color: lblColor, fontSize: "10px", fontWeight: "700", fontFamily: "ui-monospace, monospace" },
+            };
+          }
+          plotBands.push(band);
+        }
+        if (modalStock.trade_plan && modalStock.trade_plan.f1_m) {
+          plotLines.push({
+            value: modalStock.trade_plan.f1_m,
+            color: "#f59e0b",
+            dashStyle: "ShortDash",
+            width: 1.4,
+            zIndex: 4,
+            label: {
+              text: `F1-M Achievement ₹${modalStock.trade_plan.f1_m}`,
+              align: "right",
+              x: -6,
+              style: { color: "#f59e0b", fontSize: "10.5px", fontWeight: "700", fontFamily: "ui-monospace, monospace" },
+            },
+          });
+        }
+
+        modalChart = Highcharts.stockChart("dlgChart", {
+          chart: {
+            backgroundColor: th.bg,
+            plotBackgroundColor: th.plotBg,
+            height: 430,
+            spacing: [10, 12, 10, 10],
+          },
+          rangeSelector: { enabled: false },
+          credits: { enabled: false },
+          xAxis: {
+            ordinal: true,
+            lineColor: th.border,
+            gridLineWidth: 1,
+            gridLineColor: th.grid,
+            labels: { style: { color: th.muted, fontSize: "10.5px", fontFamily: "ui-monospace, monospace" } },
+          },
+          yAxis: {
+            opposite: true,
+            lineColor: th.border,
+            gridLineColor: th.grid,
+            labels: { align: "left", x: 6, style: { color: th.muted, fontSize: "10.5px", fontFamily: "ui-monospace, monospace" } },
+            plotBands,
+            plotLines,
+          },
+          legend: { enabled: true, itemStyle: { color: th.fg, fontSize: "11px" } },
+          navigator: { enabled: true, height: 28 },
+          tooltip: {
+            shared: true,
+            backgroundColor: th.tooltipBg,
+            borderColor: th.border,
+            style: { color: th.fg, fontSize: "11.5px", fontFamily: "ui-monospace, monospace" },
+            valueDecimals: 2,
+          },
+          plotOptions: { series: { animation: false, dataGrouping: { enabled: false } } },
+          series: [
+            { name: modalStock.symbol, type: "candlestick", data: ohlc, color: "#ef4444", lineColor: "#ef4444", upColor: "#22c55e", upLineColor: "#22c55e" },
+            { name: "EMA 20", type: "line", data: e20, color: "#38bdf8", lineWidth: 1.4, marker: { enabled: false } },
+            { name: "EMA 50", type: "line", data: e50, color: "#d946ef", lineWidth: 1.3, marker: { enabled: false } },
+          ],
+        });
+      }
+
+      function openStockModal(sym) {
+        const s = DATA.stocks.find((x) => x.symbol === sym);
+        if (!s) return;
+        modalStock = s;
+        modalTf = "W";
+        document.querySelectorAll(".dlg-tf").forEach((b) => b.classList.toggle("active", b.dataset.tf === modalTf));
+
+        const titleTxt = s.name.toUpperCase() === s.symbol.toUpperCase()
+          ? `${s.symbol} (₹${fmtNum(s.cmp)})`
+          : `${s.symbol} · ${s.name} (₹${fmtNum(s.cmp)})`;
+        document.getElementById("dlgTitle").textContent = titleTxt;
+        document.getElementById("dlgMeta").textContent =
+          `${s.sector} · 1D ${fmtSign(s.chg_pct)} · 1M ${fmtSign(s.ret_1m)} · 3M ${fmtSign(s.ret_3m)} · ATH ₹${fmtNum(s.ath)} (${s.dd_ath_pct}%) · Score ${s.score}/100`;
+        document.getElementById("dlgActionNote").textContent = s.action_note;
+
+        const tp = s.trade_plan;
+        document.getElementById("dlgTicket").innerHTML = tp
+          ? `
+            <div class="ticket-box"><div class="kpi-lbl">Entry Ladder</div><div class="mono" style="font-weight:800;color:var(--accent);">₹${fmtNum(tp.entry_low)}–₹${fmtNum(tp.entry_high)}</div></div>
+            <div class="ticket-box"><div class="kpi-lbl">Hard Stop Loss</div><div class="mono" style="font-weight:800;color:var(--red);">₹${fmtNum(tp.stop_loss)} (-${tp.risk_pct}%)</div></div>
+            <div class="ticket-box"><div class="kpi-lbl">Target 1 (50% Book)</div><div class="mono" style="font-weight:800;color:var(--green);">₹${fmtNum(tp.target_1)} (${tp.rr_t1}R)</div></div>
+            <div class="ticket-box"><div class="kpi-lbl">Target 2 (Trail BE)</div><div class="mono" style="font-weight:800;color:var(--green);">₹${fmtNum(tp.target_2)} (${tp.rr_t2}R)</div></div>
+            <div class="ticket-box"><div class="kpi-lbl">F1-M Achievement</div><div class="mono" style="font-weight:800;color:var(--amber);">${tp.f1_m ? "₹" + fmtNum(tp.f1_m) : "ATH Zone"}</div></div>
+          `
+          : `<div class="muted" style="grid-column:1/-1;">No active swing ticket — wait for higher-timeframe Demand Zone alignment.</div>`;
+
+        const zb = document.getElementById("dlgZonesBody");
+        zb.innerHTML = s.zones_plot.map((z) => `
+          <tr>
+            <td><strong style="color:${z.kind === "DEMAND" ? "var(--green)" : "var(--red)"}">${z.kind}</strong></td>
+            <td>${z.tf}</td>
+            <td>${z.pattern}</td>
+            <td>₹${fmtNum(Math.min(z.distal, z.proximal))} – ₹${fmtNum(Math.max(z.distal, z.proximal))}</td>
+            <td>${z.status}</td>
+            <td>${z.ach}</td>
+            <td>${z.date}</td>
+          </tr>
+        `).join("");
+
+        stockDialog.showModal();
+        updateSizer();
+        // Wait 1 animation frame so dialog layout width is measured cleanly by Highcharts
+        requestAnimationFrame(() => renderModalChart());
+      }
+
+      document.querySelectorAll(".dlg-tf").forEach((b) => {
+        b.addEventListener("click", () => {
+          modalTf = b.dataset.tf;
+          document.querySelectorAll(".dlg-tf").forEach((x) => x.classList.toggle("active", x.dataset.tf === modalTf));
+          renderModalChart();
+        });
+      });
+      document.getElementById("btnDlgLabels").addEventListener("click", (e) => {
+        modalShowLabels = !modalShowLabels;
+        e.target.classList.toggle("active", modalShowLabels);
+        renderModalChart();
+      });
+
+      // ===== 7. RENDER ALL & WIRE FILTERS + CLOUD REFRESH =====
+      function renderAll() {
+        const sm = DATA.summary;
+        const bt = DATA.backtest.overall;
+        const oneRed = DATA.backtest.by_filter["Single Red Candle in Rally (1-Red)"];
+        document.getElementById("metaLine").textContent =
+          `Updated ${DATA.updated_at_ist} · Scanned ${sm.total_scanned} NSE stocks (${sm.nifty50_scanned} Nifty 50 + ${sm.focus_scanned} IREDA/Power) in ${DATA.elapsed_sec}s · Market-Only`;
+
+        document.getElementById("kpiAct").textContent = `${sm.actionable_now}`;
+        document.getElementById("kpiActSub").textContent = `${sm.nifty_actionable} Nifty 50 · ${sm.actionable_now - sm.nifty_actionable} Focus`;
+        document.getElementById("kpiApp").textContent = `${sm.approaching}`;
+
+        const ireda = DATA.stocks.find((s) => s.symbol === "IREDA");
+        if (ireda) {
+          document.getElementById("kpiIreda").textContent = `₹${fmtNum(ireda.cmp)}`;
+          document.getElementById("kpiIredaSub").textContent = ireda.best_dz
+            ? `DZ ₹${ireda.best_dz.distal}–₹${ireda.best_dz.proximal} (+${ireda.best_dz.dist_pct}%) · M-SZ ₹128.7+`
+            : ireda.tier;
+        }
+        document.getElementById("kpiBreadth").textContent = `${sm.breadth_d200_pct}%`;
+        document.getElementById("kpiBreadthSub").textContent = `>200D · ${sm.breadth_w20_pct}% >20W · ${sm.breadth_m20_pct}% >20M`;
+        document.getElementById("kpiBt").textContent = `PF ${bt.profit_factor} · +${bt.expectancy_r}R`;
+        document.getElementById("kpiBtSub").textContent = oneRed ? `1-Red Subset: PF ${oneRed.profit_factor} (+${oneRed.expectancy_r}R, ${oneRed.win_rate}% WR)` : `${bt.trades} trades`;
+
+        // Populate sector dropdown once
+        const sel = document.getElementById("sectorFilter");
+        if (sel.options.length <= 1) {
+          for (const sec of DATA.sectors) {
+            const opt = document.createElement("option");
+            opt.value = sec.sector;
+            opt.textContent = `${sec.sector} (${sec.count})`;
+            sel.appendChild(opt);
+          }
+        }
+
+        buildScannerRows();
+        applyFilters();
+        renderFocusBasket();
+        renderSectors();
+        renderStrategyAndBacktest();
+      }
+
+      document.getElementById("filterPills").addEventListener("click", (e) => {
+        const b = e.target.closest(".pill-btn");
+        if (!b) return;
+        activeFilter = b.dataset.filter;
+        document.querySelectorAll("#filterPills .pill-btn").forEach((x) => x.classList.toggle("active", x === b));
+        applyFilters();
+      });
+      document.getElementById("sectorFilter").addEventListener("change", (e) => { activeSector = e.target.value; applyFilters(); });
+      document.getElementById("searchInput").addEventListener("input", (e) => { searchQuery = e.target.value; applyFilters(); });
+      document.getElementById("btnOpenIredaModal").addEventListener("click", () => openStockModal("IREDA"));
+      document.getElementById("btnCloseRefresh").addEventListener("click", () => document.getElementById("refreshPanel").classList.remove("open"));
+
+      async function fetchState() {
+        const r = await fetch("./demand_supply_state.json?t=" + Date.now(), { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return await r.json();
+      }
+
+      document.getElementById("btnRefreshNow").addEventListener("click", async () => {
+        const btn = document.getElementById("btnRefreshNow");
+        const panel = document.getElementById("refreshPanel");
+        const st = document.getElementById("refreshStatus");
+        panel.classList.add("open");
+        let tok = "";
+        try { tok = (localStorage.getItem(GH_TOKEN_KEY) || "").trim(); } catch (e) {}
+
+        btn.disabled = true;
+        try {
+          if (!tok) {
+            st.textContent = "Reloading latest committed demand_supply_state.json… (configure PAT in Daily Cockpit for 1-click cloud dispatch)";
+            DATA = await fetchState();
+            renderAll();
+            st.textContent = `✓ Reloaded snapshot (${DATA.updated_at_ist}).`;
+            return;
+          }
+          const prevUtc = DATA ? DATA.updated_at_utc : null;
+          st.textContent = "Triggering GitHub Actions live Nifty 50 + IREDA scan…";
+          const resp = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`, {
+            method: "POST",
+            headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ ref: "main" }),
+          });
+          if (!resp.ok) throw new Error("GitHub dispatch HTTP " + resp.status);
+          st.textContent = "Cloud scan triggered — polling for fresh JSON (~40s)…";
+          const start = Date.now();
+          while (Date.now() - start < 140000) {
+            await new Promise((r) => setTimeout(r, 5000));
+            try {
+              const fresh = await fetchState();
+              if (fresh && fresh.updated_at_utc && fresh.updated_at_utc !== prevUtc) {
+                DATA = fresh;
+                renderAll();
+                st.textContent = `✓ Live scan updated (${fresh.updated_at_ist})!`;
+                return;
+              }
+            } catch (e) {}
+          }
+          st.textContent = "Scan triggered; CDN still updating — reload in a moment.";
+        } catch (err) {
+          st.textContent = "Refresh error: " + err.message;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      loadSizer();
+      fetchState()
+        .then((d) => { DATA = d; renderAll(); })
+        .catch((err) => {
+          document.getElementById("metaLine").textContent = "Failed to load demand_supply_state.json: " + err.message;
+        });
+    })();
+  </script>
+</body>
+</html>

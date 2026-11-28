@@ -40,5 +40,8 @@ Alongside the frozen Astra review bundle above, this repository also serves a li
 | [`cockpit_state.json`](cockpit_state.json) | Auto-updated market snapshot & chart payload consumed by `cockpit.html` |
 | [`daily_ledger.jsonl`](daily_ledger.jsonl) | Falsifiable prediction-vs-reality ledger automatically graded (`HIT` / `MISS` / `EXPIRED`) on subsequent daily bars |
 | [`daily_history.jsonl`](daily_history.jsonl) | Append-only daily log of IREDA close, RSI, Macro Score, Red Lights, and Action Signal |
-| [`.github/workflows/daily_cockpit.yml`](.github/workflows/daily_cockpit.yml) | Scheduled GitHub Actions runner on off-peak minutes: **08:23, 09:37, 12:07, 14:37, 16:07 IST** (Mon–Fri) + **18:13 IST** (Sunday), plus on-demand `workflow_dispatch` |
+| [`scanner.html`](scanner.html) | Interactive **Nifty 50 & IREDA Demand & Supply Swing Scanner** (Ankur Agarwal Top-Down `Y/H/Q/M/W/D` framework): sortable/filterable 59-stock table, IREDA + Power Focus basket, Sector Synchronization Heatmap, 4-Year Walk-Forward Nifty 50 Backtest, and modal Highcharts Candlestick + Zone Inspector with browser-local CNC Position Sizer |
+| [`scripts/demand_supply_scanner.py`](scripts/demand_supply_scanner.py) | Zero-dependency Python 3 scanner & zero-lookahead walk-forward backtester across all 50 Nifty 50 constituents + 9 IREDA/Power focus stocks, outputting `demand_supply_state.json` |
+| [`demand_supply_state.json`](demand_supply_state.json) | Auto-updated Nifty 50 & IREDA Demand/Supply zones, sector sync metrics, chart payloads, and 4Y backtest stats |
+| [`.github/workflows/daily_cockpit.yml`](.github/workflows/daily_cockpit.yml) | Scheduled GitHub Actions runner on off-peak minutes: **08:23, 09:37, 12:07, 14:37, 16:07 IST** (Mon–Fri) + **18:13 IST** (Sunday), plus on-demand `workflow_dispatch` (updates both `cockpit_state.json` and `demand_supply_state.json`) |
 

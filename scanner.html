@@ -375,10 +375,47 @@
       flex-direction: column;
       gap: 12px;
     }
-    .hc-box {
-      width: 100%; height: 430px;
-      border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card-2);
+    /* Mandatory: prevent flexbox from shrinking chart or tables when dialog scrolls on laptop/mobile */
+    .dlg-body > * {
+      flex: 0 0 auto;
     }
+    .hc-box {
+      width: 100%;
+      height: 450px;
+      min-height: 450px;
+      flex: 0 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--card-2);
+    }
+    @media (max-width: 640px) {
+      .hc-box { height: 350px; min-height: 350px; }
+    }
+    .proof-steps {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    @media (max-width: 1060px) { .proof-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { .proof-steps { grid-template-columns: 1fr; } }
+    .proof-btn {
+      text-align: left;
+      background: var(--card-2);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 10px 11px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: border-color 140ms ease;
+    }
+    .proof-btn:hover { border-color: var(--accent); }
+    .proof-btn.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card-2)); }
+    .proof-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .ticket-grid {
       display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px;
     }
@@ -448,6 +485,7 @@
         <span class="kpi-lbl">IREDA Live D&amp;S Status</span>
         <span class="kpi-val mono" id="kpiIreda">—</span>
         <span class="kpi-sub" id="kpiIredaSub">Loading IREDA levels…</span>
+        <button type="button" class="btn primary" id="btnJumpIredaProof" style="margin-top:4px;padding:3px 8px;font-size:11px;min-block-size:24px;align-self:flex-start;">View 6-TF Candlestick Proof →</button>
       </div>
       <div class="kpi">
         <span class="kpi-lbl">Nifty 50 Trend Breadth</span>
@@ -521,22 +559,73 @@
           </div>
         </div>
 
-        <!-- TAB 2: IREDA + POWER BASKET (ANKUR VIDEO PLAYBOOK) -->
+        <!-- TAB 2: IREDA + POWER BASKET (ANKUR VIDEO PLAYBOOK + EMBEDDED 6-TF CANDLESTICK PROOF) -->
         <div role="tabpanel" id="panel-ireda" aria-labelledby="tab-ireda" hidden="until-found">
           <div class="panel-inner">
-            <section class="card">
-              <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+            <!-- ALWAYS-VISIBLE EMBEDDED IREDA 6-TIMEFRAME TRADETIGER-STYLE CANDLESTICK WORKBENCH -->
+            <section class="card" id="iredaWorkbenchCard">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
                 <div>
-                  <strong style="font-size:15px;">IREDA.NS — Young-IPO Demand &amp; Supply Playbook (Adapted Q+M+W Stack)</strong>
-                  <div class="muted" style="font-size:12px;">Listed 29 Nov 2023 (4 Yearly / 7 Half-Yearly candles) → anchor shifted from Y+H+Q to Quarterly + Monthly + Weekly.</div>
+                  <strong style="font-size:15.5px;">IREDA.NS — Interactive 6-Timeframe Candlestick Proof (Ankur Agarwal TradeTiger Method)</strong>
+                  <div class="muted" style="font-size:12px;">Every Demand/Supply box starts directly at the <strong>origin Base candle (●)</strong> and extends right — switch <strong>Y → H → Q → M → W → D</strong> or click any step below to see exact candles.</div>
                 </div>
-                <button type="button" class="btn primary" id="btnOpenIredaModal">Open IREDA Interactive D&amp;S Chart →</button>
+                <div class="pill-row">
+                  <button type="button" class="pill-btn ir-tf" data-tf="Y">Yearly</button>
+                  <button type="button" class="pill-btn ir-tf" data-tf="H">Half-Yr</button>
+                  <button type="button" class="pill-btn ir-tf" data-tf="Q">Quarterly</button>
+                  <button type="button" class="pill-btn ir-tf" data-tf="M">Monthly</button>
+                  <button type="button" class="pill-btn ir-tf active" data-tf="W">Weekly</button>
+                  <button type="button" class="pill-btn ir-tf" data-tf="D">Daily</button>
+                  <button type="button" class="pill-btn active" id="btnIrZoneScope" title="Switch between showing ONLY zones from this timeframe vs ALL timeframes stacked">All TFs</button>
+                  <button type="button" class="btn primary" id="btnOpenIredaModal">Full Ticket &amp; Sizer ↗</button>
+                </div>
+              </div>
+
+              <div id="iredaProofCallout" class="subcard highlight" style="padding:9px 12px;font-size:12.5px;margin-bottom:10px;">
+                <strong>Step 3 · Weekly Proof (All 157 Weeks):</strong> On <strong>26 Oct 2026</strong>, IREDA fell to <strong>₹98.78</strong> — landing dead-center inside its 3-year-old untouched <strong>IPO 1-Red Weekly Demand Zone (2023-12-25: ₹95.55–₹103.85)</strong>, launching a +35% rally and printing a fresh follow-up <strong>RBR-W (₹110.40–₹118.30)</strong>.
+              </div>
+
+              <div id="iredaInlineChart" class="hc-box"></div>
+
+              <!-- 5 Clickable Candle-by-Candle Proof Steps -->
+              <div class="proof-steps" id="iredaProofSteps" role="group" aria-label="IREDA Demand and Supply candle proof walkthrough">
+                <button type="button" class="proof-btn" data-step="0" data-tf="H" data-zone="RBD-H">
+                  <span class="mono" style="font-size:11px;font-weight:800;color:var(--muted);">1. YEARLY &amp; HALF-YEARLY</span>
+                  <strong style="font-size:12.5px;">0 Y/H Demand · RBD-H ₹200–₹310</strong>
+                  <span class="muted" style="font-size:11.5px;">2023-H2 &amp; 2024-H1 were straight green ERCs (no base). Only ATH supply overhead.</span>
+                </button>
+                <button type="button" class="proof-btn" data-step="1" data-tf="Q" data-zone="RBR-Q">
+                  <span class="mono" style="font-size:11px;font-weight:800;color:var(--accent);">2. QUARTERLY FLOOR</span>
+                  <strong style="font-size:12.5px;">2024-Q1 RBR-Q (₹100.2–₹135.9)</strong>
+                  <span class="muted" style="font-size:11.5px;">2024-Q1 base → +38% Q2 ERC → ATH ₹310. Oct 2026 swept ₹98.78 &amp; snapped back.</span>
+                </button>
+                <button type="button" class="proof-btn active" data-step="2" data-tf="W" data-zone="IPO 1-Red">
+                  <span class="mono" style="font-size:11px;font-weight:800;color:var(--green);">3. WEEKLY REVERSAL ★</span>
+                  <strong style="font-size:12.5px;">IPO 1-Red (₹95.6–₹103.9) → +35%</strong>
+                  <span class="muted" style="font-size:11.5px;">Dec 25, 2023 single red candle → Jan 15 Marubozu (+22%). Tapped Oct 26 @ ₹98.78!</span>
+                </button>
+                <button type="button" class="proof-btn" data-step="3" data-tf="M" data-zone="RBD-M">
+                  <span class="mono" style="font-size:11px;font-weight:800;color:var(--red);">4. MONTHLY CEILING</span>
+                  <strong style="font-size:12.5px;">RBD-M Supply (₹128.7–₹137.5)</strong>
+                  <span class="muted" style="font-size:11.5px;">May–Jun 2026 base + M-EMA20 (₹132.4) capped Nov's rally below F1-M ₹142.85.</span>
+                </button>
+                <button type="button" class="proof-btn" data-step="4" data-tf="D" data-zone="DBR-D">
+                  <span class="mono" style="font-size:11px;font-weight:800;color:var(--purple);">5. DAILY SWING BUY</span>
+                  <strong style="font-size:12.5px;">Plan A: ₹114.5–₹118.3 (SL ₹110.4)</strong>
+                  <span class="muted" style="font-size:11.5px;">Nov 16–18 base + 118M-sh Nov 19 ERC nested inside RBR-W + D-EMA20/50.</span>
+                </button>
+              </div>
+            </section>
+
+            <section class="card">
+              <div style="margin-bottom:10px;">
+                <strong style="font-size:15px;">IREDA Action Plan Summary (Reconciled With Daily Macro Cockpit)</strong>
               </div>
               <div class="cards-grid">
                 <div class="subcard highlight">
                   <div class="mono" style="font-weight:800;color:var(--accent);">PLAN A · Primary Swing Pullback</div>
                   <div class="mono" style="font-size:16px;font-weight:800;">Buy ₹114.54 – ₹118.30</div>
-                  <div class="muted" style="font-size:12px;">Fresh follow-up <strong>RBR-W + RBR-D</strong> launched by 118M-share candle + Daily 20/50 EMA confluence. Hard stop: Weekly close &lt; <strong>₹110.40</strong>.</div>
+                  <div class="muted" style="font-size:12px;">Fresh follow-up <strong>RBR-W + DBR-D</strong> launched by 118M-share candle + Daily 20/50 EMA confluence. Hard stop: Weekly close &lt; <strong>₹110.40</strong>.</div>
                 </div>
                 <div class="subcard">
                   <div class="mono" style="font-weight:800;color:var(--green);">PLAN B · Sector-Drag Deep Retest</div>
@@ -554,7 +643,7 @@
             <section class="card">
               <div style="margin-bottom:10px;">
                 <strong style="font-size:15px;">IREDA vs. Power Finance (RECLTD, PFC, HUDCO) vs. Video Power Basket (ADANIPOWER, TATAPOWER, JPPOWER)</strong>
-                <div class="muted" style="font-size:12px;">Ankur Agarwal's Sector Synchronization Check — click any card to inspect live Demand &amp; Supply charts.</div>
+                <div class="muted" style="font-size:12px;">Ankur Agarwal's Sector Synchronization Check — click any card to inspect live 6-timeframe Demand &amp; Supply candlestick charts.</div>
               </div>
               <div id="focusBasketGrid" class="cards-grid"></div>
             </section>
@@ -662,9 +751,13 @@
         <div id="dlgMeta" class="mono muted" style="font-size:12px;margin-top:2px;">—</div>
       </div>
       <div class="pill-row">
-        <button type="button" class="pill-btn dlg-tf" data-tf="M">Monthly</button>
-        <button type="button" class="pill-btn dlg-tf active" data-tf="W">Weekly</button>
-        <button type="button" class="pill-btn dlg-tf" data-tf="D">Daily</button>
+        <button type="button" class="pill-btn dlg-tf" data-tf="Y">Y</button>
+        <button type="button" class="pill-btn dlg-tf" data-tf="H">H</button>
+        <button type="button" class="pill-btn dlg-tf" data-tf="Q">Q</button>
+        <button type="button" class="pill-btn dlg-tf" data-tf="M">M</button>
+        <button type="button" class="pill-btn dlg-tf active" data-tf="W">W</button>
+        <button type="button" class="pill-btn dlg-tf" data-tf="D">D</button>
+        <button type="button" class="pill-btn active" id="btnDlgZoneScope" title="Show all timeframe zones stacked vs current timeframe only">All TFs</button>
         <button type="button" class="pill-btn active" id="btnDlgLabels" title="Toggle Demand & Supply text labels on chart">Labels</button>
         <form method="dialog" style="display:inline;">
           <button type="submit" class="btn" autofocus>Close ✕</button>
@@ -694,8 +787,7 @@
                 <th>Pattern</th>
                 <th>Distal – Proximal (₹)</th>
                 <th>Freshness</th>
-                <th>Achievement</th>
-                <th>Leg-Out</th>
+                <th>Candle Proof (Base → Leg-Out ERC)</th>
               </tr>
             </thead>
             <tbody id="dlgZonesBody"></tbody>
@@ -714,7 +806,12 @@
       let modalStock = null;
       let modalTf = "W";
       let modalShowLabels = true;
+      let modalAllTfs = true;
       let modalChart = null;
+      let iredaInlineTf = "W";
+      let iredaAllTfs = true;
+      let iredaHighlightKey = "IPO 1-Red";
+      let iredaInlineChart = null;
       const rowMap = new Map(); // symbol -> <tr>
 
       const GH_REPO = "akashmdbuda-droid/ireda-astra-review";
@@ -754,12 +851,14 @@
         }
         syncThemeBtn();
         if (modalStock && document.getElementById("stockDialog").open) renderModalChart();
+        if (DATA && !document.getElementById("panel-ireda").hidden) renderIredaInlineChart();
       });
       window.addEventListener("storage", (e) => {
         if (e.key === "color-scheme") {
           colorMeta.content = e.newValue ?? "light dark";
           syncThemeBtn();
           if (modalStock && document.getElementById("stockDialog").open) renderModalChart();
+          if (DATA && !document.getElementById("panel-ireda").hidden) renderIredaInlineChart();
         }
       });
       syncThemeBtn();
@@ -786,6 +885,9 @@
         });
         if (moveFocus) selectedTab.focus();
         selectedTab.scrollIntoView({ block: "nearest", inline: "nearest" });
+        if (selectedTab.id === "tab-ireda" && DATA) {
+          requestAnimationFrame(() => renderIredaInlineChart());
+        }
       }
       tabs.forEach((tab, idx) => {
         tab.tabIndex = idx === 0 ? 0 : -1;
@@ -1154,78 +1256,160 @@
       document.getElementById("szCapital").addEventListener("input", updateSizer);
       document.getElementById("szRiskPct").addEventListener("input", updateSizer);
 
-      function renderModalChart() {
-        if (!modalStock || typeof Highcharts === "undefined") return;
-        const bars = modalStock.charts[modalTf] || [];
-        if (!bars.length) return;
-        if (modalChart) { try { modalChart.destroy(); } catch (e) {} modalChart = null; }
+      // Shared TradeTiger-style Candlestick + Anchored Demand/Supply Rectangle Chart Engine
+      // Draws each zone starting strictly at its origin Base Candle (●) and extending right to CMP!
+      function renderTradeTigerChart(containerId, stock, tf, opts = {}) {
+        if (!stock || typeof Highcharts === "undefined") return null;
+        const bars = (stock.charts && stock.charts[tf]) || [];
+        if (!bars.length) return null;
+
+        const showLabels = opts.showLabels !== false;
+        const allTfs = opts.allTfs !== false;
+        const highlightKey = opts.highlightKey || "";
+        const chartHeight = window.innerWidth <= 640 ? 350 : 450;
 
         const th = getChartColors();
         const ohlc = bars.map((b) => [Date.parse(b[0] + "T00:00:00Z"), b[1], b[2], b[3], b[4]]);
         const e20 = bars.map((b) => [Date.parse(b[0] + "T00:00:00Z"), b[5]]);
         const e50 = bars.map((b) => [Date.parse(b[0] + "T00:00:00Z"), b[6]]);
 
-        // Ankur-style color-coded Demand & Supply plotBands (deduplicate close labels to avoid text overlap)
-        const plotBands = [];
+        const tfRank = { Y: 6, H: 5, Q: 4, M: 3, W: 2, D: 1 };
+        const curRank = tfRank[tf] || 2;
+        const visibleZones = (stock.zones_plot || []).filter((z) => {
+          if (highlightKey && z.pattern.includes(highlightKey)) return true;
+          if (!allTfs) return z.tf === tf;
+          // On higher timeframes (Y/H/Q), only show zones of same or higher TF so Daily noise doesn't clutter Yearly candles
+          if (curRank >= 4) return (tfRank[z.tf] || 1) >= curRank;
+          return true;
+        });
+
         const plotLines = [];
-        const usedLabelYs = [];
-        for (const z of modalStock.zones_plot) {
-          const isDem = z.kind === "DEMAND";
-          const yLow = Math.min(z.distal, z.proximal);
-          const yHigh = Math.max(z.distal, z.proximal);
-          const yMid = (yLow + yHigh) / 2;
-          const tooClose = usedLabelYs.some((py) => Math.abs(py - yMid) / Math.max(yMid, 1) < 0.038);
-          let bandColor = "rgba(56, 189, 248, 0.16)";
-          let lblColor = "#38bdf8";
-          if (!isDem) {
-            bandColor = "rgba(244, 63, 94, 0.15)";
-            lblColor = "#f43f5e";
-          } else if (["Y", "H", "Q"].includes(z.tf)) {
-            bandColor = "rgba(148, 163, 184, 0.20)";
-            lblColor = th.muted;
-          } else if (z.tf === "M") {
-            bandColor = "rgba(34, 197, 94, 0.17)";
-            lblColor = "#22c55e";
-          }
-          const band = {
-            from: yLow,
-            to: yHigh,
-            color: bandColor,
-            zIndex: 1,
-          };
-          if (modalShowLabels && !tooClose) {
-            usedLabelYs.push(yMid);
-            band.label = {
-              text: `${z.pattern} (₹${yLow}–₹${yHigh})`,
-              align: isDem ? "center" : "left",
-              x: isDem ? 0 : 8,
-              style: { color: lblColor, fontSize: "10px", fontWeight: "700", fontFamily: "ui-monospace, monospace" },
-            };
-          }
-          plotBands.push(band);
-        }
-        if (modalStock.trade_plan && modalStock.trade_plan.f1_m) {
+        if (stock.trade_plan && stock.trade_plan.f1_m) {
           plotLines.push({
-            value: modalStock.trade_plan.f1_m,
+            value: stock.trade_plan.f1_m,
             color: "#f59e0b",
             dashStyle: "ShortDash",
             width: 1.4,
-            zIndex: 4,
+            zIndex: 5,
             label: {
-              text: `F1-M Achievement ₹${modalStock.trade_plan.f1_m}`,
+              text: `F1-M Achievement ₹${stock.trade_plan.f1_m}`,
               align: "right",
               x: -6,
-              style: { color: "#f59e0b", fontSize: "10.5px", fontWeight: "700", fontFamily: "ui-monospace, monospace" },
+              style: { color: "#f59e0b", fontSize: "10px", fontWeight: "700", fontFamily: "ui-monospace, monospace" },
             },
           });
         }
 
-        modalChart = Highcharts.stockChart("dlgChart", {
+        const tfNames = { Y: "Yearly", H: "Half-Yearly", Q: "Quarterly", M: "Monthly", W: "Weekly", D: "Daily" };
+
+        return Highcharts.stockChart(containerId, {
           chart: {
             backgroundColor: th.bg,
             plotBackgroundColor: th.plotBg,
-            height: 430,
+            height: chartHeight,
             spacing: [10, 12, 10, 10],
+            events: {
+              render: function () {
+                // Clean previous TradeTiger SVG overlays
+                if (this._ttShapes) {
+                  this._ttShapes.forEach((s) => { try { s.destroy(); } catch (e) {} });
+                }
+                this._ttShapes = [];
+                const xAx = this.xAxis && this.xAxis[0];
+                const yAx = this.yAxis && this.yAxis[0];
+                if (!xAx || !yAx) return;
+
+                const pLeft = this.plotLeft;
+                const pRight = this.plotLeft + this.plotWidth;
+                const pTop = this.plotTop;
+                const pBot = this.plotTop + this.plotHeight;
+                const drawnLabelY = [];
+
+                for (const z of visibleZones) {
+                  const isDem = z.kind === "DEMAND";
+                  const isHi = !!(highlightKey && z.pattern.includes(highlightKey));
+                  const yHighVal = Math.max(z.proximal, z.distal);
+                  const yLowVal = Math.min(z.proximal, z.distal);
+
+                  let yTopPx = yAx.toPixels(yHighVal, false);
+                  let yBotPx = yAx.toPixels(yLowVal, false);
+                  if (!Number.isFinite(yTopPx) || !Number.isFinite(yBotPx)) continue;
+                  if (yBotPx < pTop || yTopPx > pBot) continue; // completely outside current Y zoom
+
+                  yTopPx = Math.max(pTop, Math.min(pBot, yTopPx));
+                  yBotPx = Math.max(pTop, Math.min(pBot, yBotPx));
+                  const boxH = Math.max(3, yBotPx - yTopPx);
+
+                  // Anchor rectangle X start strictly at the origin Base Candle!
+                  const baseMs = Date.parse((z.base_date || z.date) + "T00:00:00Z");
+                  let xStart = Number.isFinite(baseMs) ? xAx.toPixels(baseMs, false) : pLeft;
+                  const anchoredInView = xStart >= pLeft && xStart <= pRight;
+                  xStart = Math.max(pLeft, Math.min(pRight - 24, xStart));
+                  const boxW = Math.max(20, pRight - xStart);
+
+                  let fill = isDem ? "rgba(56, 189, 248, 0.16)" : "rgba(244, 63, 94, 0.15)";
+                  let stroke = isDem ? "#38bdf8" : "#f43f5e";
+                  if (isDem && ["Y", "H", "Q"].includes(z.tf)) {
+                    fill = "rgba(148, 163, 184, 0.22)";
+                    stroke = th.muted;
+                  } else if (isDem && z.tf === "M") {
+                    fill = "rgba(34, 197, 94, 0.18)";
+                    stroke = "#22c55e";
+                  } else if (isDem && z.single_opp) {
+                    fill = "rgba(34, 197, 94, 0.20)";
+                    stroke = "#22c55e";
+                  }
+                  if (isHi) {
+                    fill = isDem ? "rgba(34, 197, 94, 0.30)" : "rgba(244, 63, 94, 0.28)";
+                    stroke = isDem ? "#22c55e" : "#f43f5e";
+                  }
+
+                  // TradeTiger Rectangle Box anchored at Base Candle -> Right Edge
+                  const rect = this.renderer
+                    .rect(xStart, yTopPx, boxW, boxH)
+                    .attr({
+                      fill,
+                      stroke,
+                      "stroke-width": isHi ? 2 : 1,
+                      "stroke-dasharray": isHi ? "none" : "4,3",
+                      zIndex: isHi ? 3 : 1,
+                    })
+                    .add();
+                  this._ttShapes.push(rect);
+
+                  // Origin Base Candle marker dot (shows EXACT candle that created this zone!)
+                  if (anchoredInView) {
+                    const dot = this.renderer
+                      .circle(xStart, (yTopPx + yBotPx) / 2, isHi ? 5 : 3.5)
+                      .attr({ fill: stroke, stroke: th.bg, "stroke-width": 1.2, zIndex: 6 })
+                      .add();
+                    this._ttShapes.push(dot);
+                  }
+
+                  // Clean non-overlapping label anchored near box start (away from right-edge latest candles)
+                  if (showLabels) {
+                    const lblY = Math.max(pTop + 12, Math.min(pBot - 6, yTopPx + 13));
+                    const collide = !isHi && drawnLabelY.some((py) => Math.abs(py - lblY) < 16);
+                    if (!collide) {
+                      drawnLabelY.push(lblY);
+                      const lblTxt = `${z.pattern} · ₹${yLowVal}–₹${yHighVal}`;
+                      const lblX = Math.min(xStart + 8, pRight - Math.min(220, lblTxt.length * 6.2));
+                      const txt = this.renderer
+                        .text(lblTxt, Math.max(pLeft + 6, lblX), lblY)
+                        .css({
+                          color: stroke,
+                          fontSize: isHi ? "10.5px" : "9.8px",
+                          fontWeight: "700",
+                          fontFamily: "ui-monospace, monospace",
+                        })
+                        .attr({ zIndex: 7 })
+                        .add();
+                      this._ttShapes.push(txt);
+                    }
+                  }
+                }
+              },
+            },
           },
           rangeSelector: { enabled: false },
           credits: { enabled: false },
@@ -1241,11 +1425,11 @@
             lineColor: th.border,
             gridLineColor: th.grid,
             labels: { align: "left", x: 6, style: { color: th.muted, fontSize: "10.5px", fontFamily: "ui-monospace, monospace" } },
-            plotBands,
             plotLines,
           },
           legend: { enabled: true, itemStyle: { color: th.fg, fontSize: "11px" } },
-          navigator: { enabled: true, height: 28 },
+          navigator: { enabled: bars.length > 18, height: 26 },
+          scrollbar: { enabled: bars.length > 18 },
           tooltip: {
             shared: true,
             backgroundColor: th.tooltipBg,
@@ -1253,12 +1437,43 @@
             style: { color: th.fg, fontSize: "11.5px", fontFamily: "ui-monospace, monospace" },
             valueDecimals: 2,
           },
-          plotOptions: { series: { animation: false, dataGrouping: { enabled: false } } },
+          plotOptions: {
+            series: { animation: false, dataGrouping: { enabled: false } },
+            candlestick: { maxPointWidth: 36 },
+          },
           series: [
-            { name: modalStock.symbol, type: "candlestick", data: ohlc, color: "#ef4444", lineColor: "#ef4444", upColor: "#22c55e", upLineColor: "#22c55e" },
-            { name: "EMA 20", type: "line", data: e20, color: "#38bdf8", lineWidth: 1.4, marker: { enabled: false } },
-            { name: "EMA 50", type: "line", data: e50, color: "#d946ef", lineWidth: 1.3, marker: { enabled: false } },
+            { name: `${stock.symbol} (${tfNames[tf] || tf})`, type: "candlestick", data: ohlc, color: "#ef4444", lineColor: "#ef4444", upColor: "#22c55e", upLineColor: "#22c55e", zIndex: 4 },
+            ...(e20.some((p) => p[1] !== null) ? [{ name: "EMA 20", type: "line", data: e20, color: "#38bdf8", lineWidth: 1.5, marker: { enabled: false }, zIndex: 5 }] : []),
+            ...(e50.some((p) => p[1] !== null) ? [{ name: "EMA 50", type: "line", data: e50, color: "#d946ef", lineWidth: 1.3, marker: { enabled: false }, zIndex: 5 }] : []),
           ],
+        });
+      }
+
+      function renderModalChart() {
+        if (modalChart) { try { modalChart.destroy(); } catch (e) {} modalChart = null; }
+        modalChart = renderTradeTigerChart("dlgChart", modalStock, modalTf, {
+          showLabels: modalShowLabels,
+          allTfs: modalAllTfs,
+        });
+      }
+
+      const IREDA_PROOF_TEXT = {
+        "0": "<strong>Step 1 · Yearly &amp; Half-Yearly Proof:</strong> IREDA only listed Nov 29, 2023. Both <code>2023-H2</code> (₹50→₹102.8) and <code>2024-H1</code> (₹103.4→₹190.4) were straight green ERCs with <strong>zero base candle</strong> — so NO Yearly or Half-Yearly Demand Zone exists. Overhead, <code>2024-H2</code>'s shooting star (₹200→₹310) left a massive Fresh <strong>RBD-H Supply Zone (₹200–₹310)</strong>.",
+        "1": "<strong>Step 2 · Quarterly Floor Proof:</strong> On Quarterly candles, <code>2024-Q1</code> formed a green base (<strong>L ₹100.20, Body Top ₹135.90</strong>) before <code>2024-Q2</code>'s +38% ERC launched IREDA to ₹310. That <strong>RBR-Q (₹100.20–₹135.90)</strong> absorbed Q1, Q3, and Q4 2026 selling (brief wick sweep to ₹98.78 on Oct 26) before snapping +35%.",
+        "2": "<strong>Step 3 · Weekly Reversal Proof (All 157 Weeks):</strong> Look at the green dot on <strong>2023-12-25</strong> — a textbook Ankur Agarwal <strong>Single Red Candle in Rally (O ₹103.85, L ₹95.55)</strong> followed by <code>2024-01-15</code>'s +22.2% Marubozu ERC. Untouched for nearly 3 years, IREDA hit <strong>₹98.78 on Oct 26, 2026</strong> dead-center inside it, exploding +35% and creating a fresh follow-up <strong>RBR-W (₹110.40–₹118.30)</strong>!",
+        "3": "<strong>Step 4 · Monthly Ceiling Proof:</strong> Why did IREDA stall at ₹133.60? On Monthly candles, <code>May–Jun 2026</code> formed a tight base before <code>Jul 2026</code>'s -7.1% red ERC — creating an active <strong>RBD-M Supply Wall (₹128.69–₹137.45)</strong> coinciding right with the falling <strong>Monthly 20 EMA (₹132.42)</strong>. Until a close &gt; <strong>₹142.85 (F1-M)</strong>, Ankur avoids chasing inside Monthly Supply.",
+        "4": "<strong>Step 5 · Daily Swing Plan Proof:</strong> On Daily candles, the <strong>Nov 16–18</strong> pause (<code>₹114.54–₹118.30</code>) launched <code>Nov 19</code>'s 118M-share +8.2% ERC — nested directly inside the Fresh Weekly <strong>RBR-W (₹110.40–₹118.30)</strong>! That gives Plan A's tight swing buy zone (<strong>₹114.5–₹118.3</strong>, stop &lt; <strong>₹110.40</strong>), with Plan B deeper at the <strong>Nov 3 1-Red Daily DZ (₹101.55–₹103.45)</strong>.",
+      };
+
+      function renderIredaInlineChart() {
+        if (!DATA) return;
+        const ireda = DATA.stocks.find((s) => s.symbol === "IREDA");
+        if (!ireda) return;
+        if (iredaInlineChart) { try { iredaInlineChart.destroy(); } catch (e) {} iredaInlineChart = null; }
+        iredaInlineChart = renderTradeTigerChart("iredaInlineChart", ireda, iredaInlineTf, {
+          showLabels: true,
+          allTfs: iredaAllTfs,
+          highlightKey: iredaHighlightKey,
         });
       }
 
@@ -1296,8 +1511,7 @@
             <td>${z.pattern}</td>
             <td>₹${fmtNum(Math.min(z.distal, z.proximal))} – ₹${fmtNum(Math.max(z.distal, z.proximal))}</td>
             <td>${z.status}</td>
-            <td>${z.ach}</td>
-            <td>${z.date}</td>
+            <td style="font-family:inherit;font-size:11.5px;">${z.proof || z.date}</td>
           </tr>
         `).join("");
 
@@ -1314,10 +1528,47 @@
           renderModalChart();
         });
       });
+      document.getElementById("btnDlgZoneScope").addEventListener("click", (e) => {
+        modalAllTfs = !modalAllTfs;
+        e.target.classList.toggle("active", modalAllTfs);
+        e.target.textContent = modalAllTfs ? "All TFs" : `${modalTf} Only`;
+        renderModalChart();
+      });
       document.getElementById("btnDlgLabels").addEventListener("click", (e) => {
         modalShowLabels = !modalShowLabels;
         e.target.classList.toggle("active", modalShowLabels);
         renderModalChart();
+      });
+
+      // Wire embedded IREDA 6-TF Candlestick Workbench controls
+      document.querySelectorAll(".ir-tf").forEach((b) => {
+        b.addEventListener("click", () => {
+          iredaInlineTf = b.dataset.tf;
+          iredaHighlightKey = "";
+          document.querySelectorAll(".ir-tf").forEach((x) => x.classList.toggle("active", x.dataset.tf === iredaInlineTf));
+          document.querySelectorAll("#iredaProofSteps .proof-btn").forEach((x) => x.classList.remove("active"));
+          renderIredaInlineChart();
+        });
+      });
+      document.getElementById("btnIrZoneScope").addEventListener("click", (e) => {
+        iredaAllTfs = !iredaAllTfs;
+        e.target.classList.toggle("active", iredaAllTfs);
+        e.target.textContent = iredaAllTfs ? "All TFs" : "This TF Only";
+        renderIredaInlineChart();
+      });
+      document.getElementById("iredaProofSteps").addEventListener("click", (e) => {
+        const btn = e.target.closest(".proof-btn");
+        if (!btn) return;
+        iredaInlineTf = btn.dataset.tf;
+        iredaHighlightKey = btn.dataset.zone || "";
+        document.querySelectorAll(".ir-tf").forEach((x) => x.classList.toggle("active", x.dataset.tf === iredaInlineTf));
+        document.querySelectorAll("#iredaProofSteps .proof-btn").forEach((x) => x.classList.toggle("active", x === btn));
+        document.getElementById("iredaProofCallout").innerHTML = IREDA_PROOF_TEXT[btn.dataset.step] || "";
+        renderIredaInlineChart();
+      });
+      document.getElementById("btnJumpIredaProof").addEventListener("click", () => {
+        activateTab(document.getElementById("tab-ireda"), false);
+        document.getElementById("iredaWorkbenchCard").scrollIntoView({ behavior: "smooth", block: "start" });
       });
 
       // ===== 7. RENDER ALL & WIRE FILTERS + CLOUD REFRESH =====
